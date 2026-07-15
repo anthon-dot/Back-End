@@ -1,6 +1,0 @@
-services:
-  - type: web
-    name: spring-boot-app
-    runtime: docker
-    repo: https://github.com/anthon-dot/Back-End
-    plan: free

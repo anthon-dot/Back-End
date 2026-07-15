@@ -10,10 +10,12 @@ import io.jsonwebtoken.SignatureAlgorithm;
 
 import io.jsonwebtoken.security.Keys;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Component;
 
 import java.security.Key;
+import java.nio.charset.StandardCharsets;
 
 import java.util.Date;
 import java.util.function.Function;
@@ -25,13 +27,23 @@ public class JwtUtil {
     // SECRET KEY
     // =========================
 
-    private static final String SECRET =
-            "mysecretkeymysecretkeymysecretkey123456";
+    private final Key key;
 
-    private final Key key =
-            Keys.hmacShaKeyFor(
-                    SECRET.getBytes()
+    public JwtUtil(
+            @Value("${jwt.secret}")
+            String secret
+    ) {
+        if (secret == null || secret.length() < 32) {
+            throw new IllegalStateException(
+                    "JWT_SECRET must be set and contain at least 32 characters."
             );
+        }
+
+        this.key =
+                Keys.hmacShaKeyFor(
+                        secret.getBytes(StandardCharsets.UTF_8)
+                );
+    }
 
     // =========================
     // GENERATE TOKEN

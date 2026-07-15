@@ -94,9 +94,9 @@ public class SecurityConfig {
                         ).permitAll()
 
                         .requestMatchers(
-        HttpMethod.PUT,
-        "/api/auth/update-role/**"
-).permitAll()
+                                HttpMethod.PUT,
+                                "/api/auth/update-role/**"
+                        ).permitAll()
 
                         .requestMatchers(
                                 "/api/auth/me"
@@ -105,6 +105,11 @@ public class SecurityConfig {
                         .requestMatchers(
                                 "/v3/api-docs/**",
                                 "/swagger-ui/**"
+                        ).permitAll()
+
+                        .requestMatchers(
+                                HttpMethod.GET,
+                                "/api/health"
                         ).permitAll()
 
                         .requestMatchers(
