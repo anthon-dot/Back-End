@@ -3,7 +3,9 @@ services:
     name: rental-management-backend
     runtime: docker
     rootDir: back-end
-    dockerCommand: java -jar app.jar
+    # Point these paths relative to the repository root to be perfectly safe
+    dockerContext: ./back-end
+    dockerfilePath: ./back-end/Dockerfile
     healthCheckPath: /api/health
     envVars:
       - key: DATABASE_URL
