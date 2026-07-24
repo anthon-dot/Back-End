@@ -33,7 +33,8 @@ public class CorsConfig {
                                 "http://localhost:3000",
                                 "http://127.0.0.1:3000",
                                 "https://front-end-ui-three.vercel.app",
-                                "https://front-end-ui-git-main-anthon-dot.vercel.app"
+                                "https://front-end-ui-git-main-anthon-dot.vercel.app",
+                                "https://front-end-dcw907eh0-anthon-dot.vercel.app"
                         )
                 );
 
