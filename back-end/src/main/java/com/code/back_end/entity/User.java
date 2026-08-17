@@ -4,17 +4,21 @@ import jakarta.persistence.*;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
 
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
 @Entity
 @Table(name = "users")
 public class User {
 
     @Id
-    @GeneratedValue(
-            strategy = GenerationType.IDENTITY
-    )
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
     @Column(unique = true)
@@ -33,68 +37,5 @@ public class User {
 
     private String resetToken;
 
-    private LocalDateTime createdAt =
-            LocalDateTime.now();
-
-    // ======================
-    // GETTERS & SETTERS
-    // ======================
-
-    public Long getId() {
-        return id;
-    }
-
-    public String getUsername() {
-        return username;
-    }
-
-    public void setUsername(
-            String username
-    ) {
-        this.username = username;
-    }
-
-    public String getPassword() {
-        return password;
-    }
-
-    public void setPassword(
-            String password
-    ) {
-        this.password = password;
-    }
-
-    public String getRole() {
-        return role;
-    }
-
-    public void setRole(
-            String role
-    ) {
-        this.role = role;
-    }
-
-    public String getStatus() {
-        return status;
-    }
-
-    public void setStatus(
-            String status
-    ) {
-        this.status = status;
-    }
-
-    public String getResetToken() {
-        return resetToken;
-    }
-
-    public void setResetToken(
-            String resetToken
-    ) {
-        this.resetToken = resetToken;
-    }
-
-    public LocalDateTime getCreatedAt() {
-        return createdAt;
-    }
+    private LocalDateTime createdAt = LocalDateTime.now();
 }

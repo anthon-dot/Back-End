@@ -1,16 +1,17 @@
 package com.code.back_end.controller;
 
-import com.code.back_end.entity.Stakeholder;
 import com.code.back_end.dto.ApplicantFeeRequest;
 import com.code.back_end.dto.RequirementStatusResponse;
 import com.code.back_end.dto.StallAssignmentRequest;
 import com.code.back_end.dto.TreasurerApprovalRequest;
+import com.code.back_end.entity.Stakeholder;
+import com.code.back_end.service.ApplicantApprovalService;
 import com.code.back_end.service.ApprovalWorkflowService;
+import com.code.back_end.service.StakeholderDocumentService;
 import com.code.back_end.service.StakeholderService;
-
+import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
-import org.springframework.http.HttpStatus;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.io.IOException;
@@ -21,52 +22,40 @@ import java.util.List;
 @RequestMapping("/api/stakeholders")
 public class StakeholderController {
 
-    private final StakeholderService service;
+    private final StakeholderService stakeholderService;
+    private final ApplicantApprovalService applicantApprovalService;
+    private final StakeholderDocumentService stakeholderDocumentService;
     private final ApprovalWorkflowService approvalWorkflowService;
 
     public StakeholderController(
-            StakeholderService service,
+            StakeholderService stakeholderService,
+            ApplicantApprovalService applicantApprovalService,
+            StakeholderDocumentService stakeholderDocumentService,
             ApprovalWorkflowService approvalWorkflowService
     ) {
-
-        this.service = service;
+        this.stakeholderService = stakeholderService;
+        this.applicantApprovalService = applicantApprovalService;
+        this.stakeholderDocumentService = stakeholderDocumentService;
         this.approvalWorkflowService = approvalWorkflowService;
     }
 
     // =========================
-    // CREATE
+    // CREATE (DEPRECATED - USE /api/applications)
     // =========================
-
-    @PostMapping(
-            consumes = "multipart/form-data"
-    )
+    @PostMapping(consumes = "multipart/form-data")
     public String create(
-
             @RequestParam Long userId,
-
             @RequestParam String businessName,
-
             @RequestParam String businessType,
-
             @RequestParam String firstName,
-
-            @RequestParam(required = false)
-            String middleName,
-
+            @RequestParam(required = false) String middleName,
             @RequestParam String lastName,
-
             @RequestParam String contact,
-
             @RequestParam String email,
-
             @RequestParam String address,
-
             @RequestParam MultipartFile idFile,
-
             @RequestParam MultipartFile letterFile
-
     ) throws IOException {
-
         throw new ResponseStatusException(
                 HttpStatus.BAD_REQUEST,
                 "Submit business applications through /api/applications. Stakeholders are created only after approval."
@@ -74,168 +63,102 @@ public class StakeholderController {
     }
 
     // =========================
-    // GET ALL
+    // GET ALL & BY ID
     // =========================
-
     @GetMapping
     public List<Stakeholder> getAll() {
-
-        return service.getAll();
+        return stakeholderService.getAll();
     }
 
     @GetMapping("/for-approval")
     public List<Stakeholder> getForApproval() {
+        return stakeholderService.getForApproval();
+    }
 
-        return service.getForApproval();
+    @GetMapping("/user/{userId}")
+    public Stakeholder getByUserId(@PathVariable Long userId) {
+        return stakeholderService.getByUserId(userId);
+    }
+
+    @GetMapping("/{id}")
+    public Stakeholder getById(@PathVariable Long id) {
+        return stakeholderService.getById(id);
     }
 
     // =========================
-    // GET BY ID
+    // MARKET SUPERVISOR APPROVAL
     // =========================
-// =========================
-// GET BY USER ID
-// =========================
-@GetMapping("/user/{userId}")
-public Stakeholder getByUserId(
-        @PathVariable Long userId
-) {
-
-    return service.getByUserId(userId);
-}
-
-// GET BY ID
-@GetMapping("/{id}")
-public Stakeholder getById(
-        @PathVariable Long id
-) {
-    return service.getById(id);
-}
-
-    // =========================
-    // MARKET SUPERVISOR APPROVE
-    // =========================
-
-    @PutMapping("/{id}/market-supervisor")
-    public Stakeholder marketSupervisorApprove(
-            @PathVariable Long id
-    ) {
-
-        return service
-                .approveMarketSupervisor(id);
-    }
-
     @PutMapping("/{id}/market-approve")
-    public Stakeholder marketApprove(
-            @PathVariable Long id
-    ) {
-
-        return service
-                .approveMarketSupervisor(id);
+    public Stakeholder marketApprove(@PathVariable Long id) {
+        return applicantApprovalService.approveMarketSupervisor(id);
     }
 
     @PutMapping("/{id}/market-reject")
-    public Stakeholder marketReject(
-            @PathVariable Long id
-    ) {
-
-        return service
-                .rejectMarketSupervisor(id);
+    public Stakeholder marketReject(@PathVariable Long id) {
+        return applicantApprovalService.rejectMarketSupervisor(id);
     }
 
     // =========================
-    // BPLO APPROVE
+    // BPLO APPROVAL
     // =========================
-
-    @PutMapping("/{id}/bplo")
-    public Stakeholder bploApprove(
-            @PathVariable Long id
-    ) {
-
-        return service
-                .approveBplo(id);
-    }
-
     @PutMapping("/{id}/bplo-approve")
-    public Stakeholder bploApproveStage(
-            @PathVariable Long id
-    ) {
-
-        return service
-                .approveBplo(id);
+    public Stakeholder bploApprove(@PathVariable Long id) {
+        return applicantApprovalService.approveBplo(id);
     }
 
     @PutMapping("/{id}/bplo-reject")
-    public Stakeholder bploReject(
-            @PathVariable Long id
-    ) {
-
-        return service
-                .rejectBplo(id);
+    public Stakeholder bploReject(@PathVariable Long id) {
+        return applicantApprovalService.rejectBplo(id);
     }
 
     // =========================
-    // ENDORSING APPROVE
+    // ENDORSEMENT OFFICE APPROVAL
     // =========================
-
-    @PutMapping("/{id}/endorsing")
-    public Stakeholder endorsingApprove(
-            @PathVariable Long id
-    ) {
-
-        return service
-                .approveEndorsing(id);
-    }
-
     @PutMapping("/{id}/endorse")
-    public Stakeholder endorse(
-            @PathVariable Long id
-    ) {
-
-        return service
-                .approveEndorsing(id);
+    public Stakeholder endorse(@PathVariable Long id) {
+        return applicantApprovalService.approveEndorsing(id);
     }
 
     @PutMapping("/{id}/endorse-reject")
     public Stakeholder endorseReject(
             @PathVariable Long id,
-
-            @RequestParam(required = false)
-            String remarks
+            @RequestParam(required = false) String remarks
     ) {
-
-        return service
-                .rejectEndorsing(id, remarks);
+        return applicantApprovalService.rejectEndorsing(id, remarks);
     }
 
+    // =========================
+    // APPLICANT FEE & FINAL APPROVAL
+    // =========================
     @PutMapping("/{id}/pay-applicant-fee")
     public Stakeholder payApplicantFee(
             @PathVariable Long id,
-
             @RequestParam BigDecimal amount
     ) {
-
-        return service
-                .payApplicantFee(id, amount);
+        return applicantApprovalService.payApplicantFee(id, amount);
     }
-
-    // =========================
-    // FINAL APPROVE
-    // =========================
 
     @PutMapping("/{id}/approve")
-    public Stakeholder approve(
-            @PathVariable Long id
-    ) {
-
-        return service.approve(id);
+    public Stakeholder approve(@PathVariable Long id) {
+        return applicantApprovalService.approve(id);
     }
 
+    @PutMapping("/{id}/reject")
+    public Stakeholder reject(
+            @PathVariable Long id,
+            @RequestParam(required = false) String remarks
+    ) {
+        return applicantApprovalService.reject(id, remarks);
+    }
+
+    // =========================
+    // WORKFLOW SERVICES
+    // =========================
     @PostMapping("/{id}/treasurer-approve")
     public Stakeholder treasurerApprove(
             @PathVariable Long id,
             @RequestBody TreasurerApprovalRequest request
     ) {
-
         return approvalWorkflowService.approveByTreasurer(id, request);
     }
 
@@ -244,23 +167,16 @@ public Stakeholder getById(
             @PathVariable Long id,
             @RequestBody StallAssignmentRequest request
     ) {
-
         return approvalWorkflowService.assignStallAndCreateContract(id, request);
     }
 
     @PostMapping("/{id}/bplo-approve-workflow")
-    public Stakeholder approveBploWorkflow(
-            @PathVariable Long id
-    ) {
-
+    public Stakeholder approveBploWorkflow(@PathVariable Long id) {
         return approvalWorkflowService.approveBplo(id);
     }
 
     @PostMapping("/{id}/final-endorse")
-    public Stakeholder finalEndorse(
-            @PathVariable Long id
-    ) {
-
+    public Stakeholder finalEndorse(@PathVariable Long id) {
         return approvalWorkflowService.finalEndorse(id);
     }
 
@@ -269,64 +185,36 @@ public Stakeholder getById(
             @PathVariable Long id,
             @RequestBody ApplicantFeeRequest request
     ) {
-
         return approvalWorkflowService.collectApplicantFee(id, request);
     }
 
     @GetMapping("/{id}/requirements")
-    public RequirementStatusResponse requirements(
-            @PathVariable Long id
-    ) {
-
+    public RequirementStatusResponse requirements(@PathVariable Long id) {
         return approvalWorkflowService.getRequirementStatus(id);
-    }
-
-    // =========================
-    // REJECT
-    // =========================
-
-    @PutMapping("/{id}/reject")
-    public Stakeholder reject(
-            @PathVariable Long id,
-            @RequestParam(required = false) String remarks
-    ) {
-
-        return service.reject(id, remarks);
     }
 
     // =========================
     // DELETE
     // =========================
-
     @DeleteMapping("/{id}")
-    public String delete(
-            @PathVariable Long id
-    ) {
-
-        return service.delete(id);      
+    public String delete(@PathVariable Long id) {
+        return stakeholderService.delete(id);
     }
+
     // =========================
-// UPLOAD DOCUMENT
-// =========================
-
-@PutMapping(
-        value = "/{userId}/upload/{type}",
-        consumes = "multipart/form-data"
-)
-public Stakeholder uploadDocument(
-
-        @PathVariable Long userId,
-
-        @PathVariable String type,
-
-        @RequestParam MultipartFile file
-
-) throws IOException {
-
-    return service.uploadDocument(
-            userId,
-            type,
-            file
-    );
-}
+    // UPLOAD DOCUMENT
+    // =========================
+    @PutMapping(
+            value = "/{userId}/upload/{type}",
+            consumes = "multipart/form-data"
+    )
+    public Stakeholder uploadDocument(
+            @PathVariable Long userId,
+            @PathVariable String type,
+            @RequestParam MultipartFile file
+    ) throws IOException {
+        Stakeholder stakeholder = stakeholderDocumentService.uploadDocument(userId, type, file);
+        applicantApprovalService.updateOverallStatus(stakeholder);
+        return stakeholder;
+    }
 }

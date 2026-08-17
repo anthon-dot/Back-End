@@ -1,21 +1,17 @@
 package com.code.back_end.config;
 
+import com.code.back_end.enums.Role;
 import com.code.back_end.util.JwtUtil;
-
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
-
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
-
 import org.springframework.security.core.userdetails.UserDetailsService;
-
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
-
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
@@ -23,67 +19,40 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 @EnableMethodSecurity
 public class SecurityConfig {
 
+    private static final String ROLE_ADMIN = Role.ROLE_ADMIN.roleWithoutPrefix();
+    private static final String ROLE_MARKET_SUPERVISOR = Role.ROLE_MARKET_SUPERVISOR.roleWithoutPrefix();
+    private static final String ROLE_BPLO = Role.ROLE_BPLO.roleWithoutPrefix();
+    private static final String ROLE_ENDORSEMENT_OFFICE = Role.ROLE_ENDORSEMENT_OFFICE.roleWithoutPrefix();
+
     private final JwtUtil jwtUtil;
 
-    public SecurityConfig(
-            JwtUtil jwtUtil
-    ) {
+    public SecurityConfig(JwtUtil jwtUtil) {
         this.jwtUtil = jwtUtil;
     }
 
-    // =====================
-    // PASSWORD ENCODER
-    // =====================
     @Bean
-    public PasswordEncoder
-    passwordEncoder() {
-
+    public PasswordEncoder passwordEncoder() {
         return new BCryptPasswordEncoder();
     }
 
-    // =====================
-    // JWT FILTER
-    // =====================
     @Bean
-    public JwtAuthFilter jwtAuthFilter(
-            UserDetailsService
-                    userDetailsService
-    ) {
-
-        return new JwtAuthFilter(
-                jwtUtil,
-                userDetailsService
-        );
+    public JwtAuthFilter jwtAuthFilter(UserDetailsService userDetailsService) {
+        return new JwtAuthFilter(jwtUtil, userDetailsService);
     }
 
-    // =====================
-    // SECURITY
-    // =====================
     @Bean
-    public SecurityFilterChain
-    securityFilterChain(
+    public SecurityFilterChain securityFilterChain(
             HttpSecurity http,
-            JwtAuthFilter filter
+            JwtAuthFilter filter,
+            AuthRateLimitFilter authRateLimitFilter
     ) throws Exception {
 
         http
-
-                .csrf(csrf ->
-                        csrf.disable()
-                )
-
-                .cors(
-                        Customizer
-                                .withDefaults()
-                )
-
+                .csrf(csrf -> csrf.disable())
+                .cors(Customizer.withDefaults())
                 .sessionManagement(session ->
-                        session.sessionCreationPolicy(
-                                SessionCreationPolicy
-                                        .STATELESS
-                        )
+                        session.sessionCreationPolicy(SessionCreationPolicy.STATELESS)
                 )
-
                 .authorizeHttpRequests(auth -> auth
 
                         // PUBLIC APIs
@@ -96,7 +65,7 @@ public class SecurityConfig {
                         .requestMatchers(
                                 HttpMethod.PUT,
                                 "/api/auth/update-role/**"
-                        ).permitAll()
+                        ).hasAnyRole(ROLE_ADMIN)
 
                         .requestMatchers(
                                 "/api/auth/me"
@@ -127,7 +96,7 @@ public class SecurityConfig {
                                 "/api/ai/notifications/**",
                                 "/api/audit-logs/**"
                         ).hasAnyRole(
-                                "ADMIN",
+                                ROLE_ADMIN,
                                 "TREASURER"
                         )
 
@@ -135,7 +104,7 @@ public class SecurityConfig {
                                 HttpMethod.POST,
                                 "/api/stalls/**"
                         ).hasAnyRole(
-                                "ADMIN",
+                                ROLE_ADMIN,
                                 "TREASURER"
                         )
 
@@ -143,7 +112,7 @@ public class SecurityConfig {
                                 HttpMethod.PUT,
                                 "/api/stalls/**"
                         ).hasAnyRole(
-                                "ADMIN",
+                                ROLE_ADMIN,
                                 "TREASURER"
                         )
 
@@ -152,31 +121,28 @@ public class SecurityConfig {
                                 "/api/contracts/**",
                                 "/api/occupants/**"
                         ).hasAnyRole(
-                                "ADMIN",
+                                ROLE_ADMIN,
                                 "TREASURER",
                                 "SUPERVISOR",
                                 "MARKETSUPERVISOR",
-                                "MARKET_SUPERVISOR",
-                                "BPLO",
+                                ROLE_MARKET_SUPERVISOR,
+                                ROLE_BPLO,
                                 "BPLOOFFICE",
                                 "BPLO_OFFICE",
                                 "ENDORSINGOFFICE",
                                 "ENDORSING_OFFICE",
                                 "ENDORSING_OFFICER",
-                                "ENDORISING_OFFICE"
+                                ROLE_ENDORSEMENT_OFFICE
                         )
 
                         .requestMatchers(
                                 HttpMethod.PUT,
                                 "/api/contracts/**",
                                 "/api/occupants/**",
-                                "/api/stakeholders/*/market-supervisor",
                                 "/api/stakeholders/*/market-approve",
                                 "/api/stakeholders/*/market-reject",
-                                "/api/stakeholders/*/bplo",
                                 "/api/stakeholders/*/bplo-approve",
                                 "/api/stakeholders/*/bplo-reject",
-                                "/api/stakeholders/*/endorsing",
                                 "/api/stakeholders/*/endorse",
                                 "/api/stakeholders/*/endorse-reject",
                                 "/api/stakeholders/*/pay-applicant-fee",
@@ -194,25 +160,25 @@ public class SecurityConfig {
                                 "/api/applications/*/bplo-approve",
                                 "/api/applications/*/bplo-reject"
                         ).hasAnyRole(
-                                "ADMIN",
+                                ROLE_ADMIN,
                                 "TREASURER",
                                 "SUPERVISOR",
                                 "MARKETSUPERVISOR",
-                                "MARKET_SUPERVISOR",
-                                "BPLO",
+                                ROLE_MARKET_SUPERVISOR,
+                                ROLE_BPLO,
                                 "BPLOOFFICE",
                                 "BPLO_OFFICE",
                                 "ENDORSINGOFFICE",
                                 "ENDORSING_OFFICE",
                                 "ENDORSING_OFFICER",
-                                "ENDORISING_OFFICE"
+                                ROLE_ENDORSEMENT_OFFICE
                         )
 
                         .requestMatchers(
                                 HttpMethod.DELETE,
                                 "/api/**"
                         ).hasAnyRole(
-                                "ADMIN",
+                                ROLE_ADMIN,
                                 "TREASURER"
                         )
 
@@ -233,25 +199,28 @@ public class SecurityConfig {
                         .requestMatchers(
                                 "/api/occupants/**"
                         ).hasAnyRole(
-                                "ADMIN",
+                                ROLE_ADMIN,
                                 "TREASURER",
                                 "SUPERVISOR",
                                 "MARKETSUPERVISOR",
-                                "MARKET_SUPERVISOR",
-                                "BPLO",
+                                ROLE_MARKET_SUPERVISOR,
+                                ROLE_BPLO,
                                 "BPLOOFFICE",
                                 "BPLO_OFFICE",
                                 "ENDORSINGOFFICE",
                                 "ENDORSING_OFFICE",
                                 "ENDORSING_OFFICER",
-                                "ENDORISING_OFFICE"
+                                ROLE_ENDORSEMENT_OFFICE
                         )
 
                         // EVERYTHING ELSE
                         .anyRequest()
                         .authenticated()
                 )
-
+                .addFilterBefore(
+                        authRateLimitFilter,
+                        UsernamePasswordAuthenticationFilter.class
+                )
                 .addFilterBefore(
                         filter,
                         UsernamePasswordAuthenticationFilter.class
@@ -260,3 +229,5 @@ public class SecurityConfig {
         return http.build();
     }
 }
+
+

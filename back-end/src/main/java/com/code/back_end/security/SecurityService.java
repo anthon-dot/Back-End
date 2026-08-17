@@ -1,6 +1,7 @@
 package com.code.back_end.security;
 
 import com.code.back_end.entity.User;
+import com.code.back_end.enums.Role;
 import com.code.back_end.repository.StakeholderRepository;
 import com.code.back_end.repository.UserRepository;
 import org.springframework.http.HttpStatus;
@@ -10,33 +11,21 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.util.EnumSet;
 import java.util.Set;
 
 @Service
 public class SecurityService {
 
-    private static final Set<String> ADMIN_ROLES =
-            Set.of("ADMIN", "TREASURER");
+    private static final Set<Role> ADMIN_ROLES = EnumSet.of(Role.ROLE_ADMIN);
 
-    private static final Set<String> SUPERVISOR_ROLES =
-            Set.of(
-                    "SUPERVISOR",
-                    "MARKETSUPERVISOR",
-                    "MARKET_SUPERVISOR",
-                    "BPLO_OFFICE",
-                    "BPLOOFFICE",
-                    "BPLO",
-                    "ENDORSINGOFFICE",
-                    "ENDORSING_OFFICE",
-                    "ENDORSING_OFFICER",
-                    "ENDORISING_OFFICE"
-            );
+    private static final Set<Role> SUPERVISOR_ROLES = EnumSet.of(
+            Role.ROLE_MARKET_SUPERVISOR,
+            Role.ROLE_BPLO,
+            Role.ROLE_ENDORSEMENT_OFFICE
+    );
 
-    private static final Set<String> TENANT_ROLES =
-            Set.of("TENANT", "STAKEHOLDER");
-
-    private static final Set<String> APPLICANT_ROLES =
-            Set.of("APPLICANT", "STAKEHOLDER");
+    private static final Set<Role> STAKEHOLDER_ROLES = EnumSet.of(Role.ROLE_STAKEHOLDER);
 
     private final UserRepository userRepository;
     private final StakeholderRepository stakeholderRepository;
@@ -50,51 +39,42 @@ public class SecurityService {
     }
 
     public User currentUser() {
-        Authentication authentication =
-                SecurityContextHolder.getContext()
-                        .getAuthentication();
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
 
-        if (
-                authentication == null ||
-                !authentication.isAuthenticated() ||
-                "anonymousUser".equals(authentication.getPrincipal())
-        ) {
-            throw new ResponseStatusException(
-                    HttpStatus.UNAUTHORIZED,
-                    "Authentication is required"
-            );
+        if (authentication == null || !authentication.isAuthenticated() || "anonymousUser".equals(authentication.getPrincipal())) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Authentication is required");
         }
 
-        return userRepository
-                .findByUsername(authentication.getName())
-                .orElseThrow(() ->
-                        new ResponseStatusException(
-                                HttpStatus.UNAUTHORIZED,
-                                "Authenticated user not found"
-                        )
-                );
+        return userRepository.findByUsername(authentication.getName())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Authenticated user not found"));
+    }
+
+    public Role currentRoleEnum() {
+        return Role.fromString(currentUser().getRole());
     }
 
     public String currentRole() {
-        return normalizeRole(
-                currentUser().getRole()
-        );
+        Role role = currentRoleEnum();
+        return role != null ? role.roleWithoutPrefix() : normalizeRole(currentUser().getRole());
     }
 
     public boolean isAdmin() {
-        return ADMIN_ROLES.contains(currentRole());
+        Role role = currentRoleEnum();
+        return role != null && ADMIN_ROLES.contains(role);
     }
 
     public boolean isSupervisor() {
-        return SUPERVISOR_ROLES.contains(currentRole());
+        Role role = currentRoleEnum();
+        return role != null && SUPERVISOR_ROLES.contains(role);
     }
 
     public boolean isTenant() {
-        return TENANT_ROLES.contains(currentRole());
+        Role role = currentRoleEnum();
+        return role != null && STAKEHOLDER_ROLES.contains(role);
     }
 
     public boolean isApplicant() {
-        return APPLICANT_ROLES.contains(currentRole());
+        return isTenant();
     }
 
     public boolean canManageOperations() {
@@ -103,139 +83,79 @@ public class SecurityService {
 
     public void requireAdmin() {
         if (!isAdmin()) {
-            throw new AccessDeniedException(
-                    "Admin access is required"
-            );
+            throw new AccessDeniedException("Admin access is required");
         }
     }
 
     public void requireSupervisorOrAdmin() {
         if (!canManageOperations()) {
-            throw new AccessDeniedException(
-                    "Supervisor or admin access is required"
-            );
+            throw new AccessDeniedException("Supervisor or admin access is required");
         }
     }
 
     public void requireTreasurerOrAdmin() {
-        String role = currentRole();
-
-        if ("ADMIN".equals(role) || "TREASURER".equals(role)) {
-            return;
+        if (!isAdmin()) {
+            throw new AccessDeniedException("Treasurer access is required");
         }
-
-        throw new AccessDeniedException(
-                "Treasurer access is required"
-        );
     }
 
     public void requireMarketSupervisorOrAdmin() {
-        String role = currentRole();
-
-        if (
-                "ADMIN".equals(role)
-                        || "MARKETSUPERVISOR".equals(role)
-                        || "MARKET_SUPERVISOR".equals(role)
-                        || "SUPERVISOR".equals(role)
-        ) {
+        Role role = currentRoleEnum();
+        if (isAdmin() || role == Role.ROLE_MARKET_SUPERVISOR) {
             return;
         }
-
-        throw new AccessDeniedException(
-                "Market supervisor access is required"
-        );
+        throw new AccessDeniedException("Market supervisor access is required");
     }
 
     public void requireBploOrAdmin() {
-        String role = currentRole();
-
-        if (
-                "ADMIN".equals(role)
-                        || "BPLO".equals(role)
-                        || "BPLO_OFFICE".equals(role)
-                        || "BPLOOFFICE".equals(role)
-        ) {
+        Role role = currentRoleEnum();
+        if (isAdmin() || role == Role.ROLE_BPLO) {
             return;
         }
-
-        throw new AccessDeniedException(
-                "BPLO access is required"
-        );
+        throw new AccessDeniedException("BPLO access is required");
     }
 
     public void requireEndorsingOfficerOrAdmin() {
-        String role = currentRole();
-
-        if (
-                "ADMIN".equals(role)
-                        || "ENDORSING_OFFICE".equals(role)
-                        || "ENDORISING_OFFICE".equals(role)
-                        || "ENDORSING_OFFICER".equals(role)
-                        || "ENDORSINGOFFICE".equals(role)
-        ) {
+        Role role = currentRoleEnum();
+        if (isAdmin() || role == Role.ROLE_ENDORSEMENT_OFFICE) {
             return;
         }
-
-        throw new AccessDeniedException(
-                "Endorsing officer access is required"
-        );
+        throw new AccessDeniedException("Endorsing officer access is required");
     }
 
     public void requireSelfUserOrStaff(Long userId) {
         User user = currentUser();
-
-        if (
-                canManageOperations() ||
-                user.getId().equals(userId)
-        ) {
+        if (canManageOperations() || (user.getId() != null && user.getId().equals(userId))) {
             return;
         }
-
-        throw new AccessDeniedException(
-                "You can only access your own user record"
-        );
+        throw new AccessDeniedException("You can only access your own user record");
     }
 
     public void requireStakeholderOwnerOrStaff(Long ownerUserId) {
         User user = currentUser();
-
-        if (
-                canManageOperations() ||
-                user.getId().equals(ownerUserId)
-        ) {
+        if (canManageOperations() || (user.getId() != null && user.getId().equals(ownerUserId))) {
             return;
         }
-
-        throw new AccessDeniedException(
-                "You can only access your own records"
-        );
+        throw new AccessDeniedException("You can only access your own records");
     }
 
     public void requireVerifiedStakeholderOwnerOrStaff(Long ownerUserId) {
         User user = currentUser();
-
         if (canManageOperations()) {
             return;
         }
 
-        if (!user.getId().equals(ownerUserId)) {
-            throw new AccessDeniedException(
-                    "You can only access your own records"
-            );
+        if (user.getId() == null || !user.getId().equals(ownerUserId)) {
+            throw new AccessDeniedException("You can only access your own records");
         }
 
-        boolean verified =
-                stakeholderRepository.findByUser_Id(ownerUserId)
-                        .map(stakeholder ->
-                                Boolean.TRUE.equals(stakeholder.getVerified())
-                                        && Boolean.TRUE.equals(stakeholder.getApplicantFeePaid())
-                        )
-                        .orElse(false);
+        boolean verified = stakeholderRepository.findByUser_Id(ownerUserId)
+                .map(stakeholder -> Boolean.TRUE.equals(stakeholder.getVerified())
+                        && Boolean.TRUE.equals(stakeholder.getApplicantFeePaid()))
+                .orElse(false);
 
         if (!verified) {
-            throw new AccessDeniedException(
-                    "Applicant fee payment required before dashboard access."
-            );
+            throw new AccessDeniedException("Applicant fee payment required before dashboard access.");
         }
     }
 
@@ -243,10 +163,10 @@ public class SecurityService {
         if (role == null) {
             return "";
         }
-
-        return role
-                .replace("ROLE_", "")
-                .trim()
-                .toUpperCase();
+        Role parsed = Role.fromString(role);
+        if (parsed != null) {
+            return parsed.roleWithoutPrefix();
+        }
+        return role.replace("ROLE_", "").trim().toUpperCase();
     }
 }

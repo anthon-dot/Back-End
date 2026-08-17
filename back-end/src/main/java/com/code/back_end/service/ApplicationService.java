@@ -32,6 +32,7 @@ public class ApplicationService {
     private final SecurityService securityService;
     private final AuditLogService auditLogService;
     private final NotificationService notificationService;
+    private final FileStorageService fileStorageService;
 
     public ApplicationService(
             BusinessApplicationRepository applicationRepository,
@@ -41,7 +42,8 @@ public class ApplicationService {
             StakeholderDocumentRepository stakeholderDocumentRepository,
             SecurityService securityService,
             AuditLogService auditLogService,
-            NotificationService notificationService
+            NotificationService notificationService,
+            FileStorageService fileStorageService
     ) {
         this.applicationRepository = applicationRepository;
         this.userRepository = userRepository;
@@ -51,6 +53,7 @@ public class ApplicationService {
         this.securityService = securityService;
         this.auditLogService = auditLogService;
         this.notificationService = notificationService;
+        this.fileStorageService = fileStorageService;
     }
 
     public BusinessApplication create(
@@ -457,23 +460,7 @@ public class ApplicationService {
     }
 
     private String saveFile(MultipartFile file) throws IOException {
-        String uploadDir = System.getProperty("user.dir") + "/uploads/";
-        File folder = new File(uploadDir);
-
-        if (!folder.exists()) {
-            folder.mkdirs();
-        }
-
-        String originalName = file.getOriginalFilename();
-        String cleanName =
-                originalName == null
-                        ? "file"
-                        : originalName.replaceAll("[^a-zA-Z0-9.]", "_");
-        String fileName = System.currentTimeMillis() + "_" + cleanName;
-        String filePath = uploadDir + fileName;
-
-        file.transferTo(new File(filePath));
-        return filePath;
+        return fileStorageService.storeFile(file);
     }
 
     private void saveApplicationDocument(

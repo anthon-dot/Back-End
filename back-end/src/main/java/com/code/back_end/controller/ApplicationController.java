@@ -84,7 +84,7 @@ public class ApplicationController {
     }
 
     @PutMapping("/{id}/endorse")
-    @PreAuthorize("hasAnyRole('ENDORSING_OFFICE', 'ENDORISING_OFFICE')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'ENDORSEMENT_OFFICE', 'ENDORSING_OFFICE')")
     public BusinessApplication endorse(
             @PathVariable Long id
     ) {
@@ -92,7 +92,7 @@ public class ApplicationController {
     }
 
     @PutMapping("/{id}/endorse-reject")
-    @PreAuthorize("hasAnyRole('ENDORSING_OFFICE', 'ENDORISING_OFFICE')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'ENDORSEMENT_OFFICE', 'ENDORSING_OFFICE')")
     public BusinessApplication rejectEndorsement(
             @PathVariable Long id,
             @RequestParam(required = false) String remarks
@@ -101,7 +101,7 @@ public class ApplicationController {
     }
 
     @PutMapping("/{id}/bplo-approve")
-    @PreAuthorize("hasRole('BPLO_OFFICE')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'BPLO', 'BPLO_OFFICE')")
     public BusinessApplication approveByBplo(
             @PathVariable Long id
     ) {
@@ -109,7 +109,7 @@ public class ApplicationController {
     }
 
     @PutMapping("/{id}/bplo-reject")
-    @PreAuthorize("hasRole('BPLO_OFFICE')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'BPLO', 'BPLO_OFFICE')")
     public BusinessApplication rejectByBplo(
             @PathVariable Long id,
             @RequestParam(required = false) String remarks
