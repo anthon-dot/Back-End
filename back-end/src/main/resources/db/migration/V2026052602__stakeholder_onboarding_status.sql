@@ -2,7 +2,7 @@ ALTER TABLE stakeholders
     ADD COLUMN IF NOT EXISTS onboarding_status VARCHAR(50);
 
 ALTER TABLE stakeholders
-    ALTER COLUMN onboarding_status TYPE VARCHAR(50);
+    ALTER COLUMN onboarding_status TYPE VARCHAR(50) USING onboarding_status::VARCHAR(50);
 
 ALTER TABLE stakeholders
     ADD COLUMN IF NOT EXISTS advance_payment_paid BOOLEAN DEFAULT FALSE;
@@ -47,16 +47,23 @@ SET onboarding_status = CASE
     ELSE onboarding_status
 END;
 
+-- Fix: split SET DEFAULT and SET NOT NULL into separate statements to avoid ERROR 42601
 ALTER TABLE stakeholders
-    ALTER COLUMN onboarding_status SET DEFAULT 'NEW',
+    ALTER COLUMN onboarding_status SET DEFAULT 'NEW';
+
+ALTER TABLE stakeholders
     ALTER COLUMN onboarding_status SET NOT NULL;
 
 ALTER TABLE stakeholders
-    ALTER COLUMN advance_payment_paid SET DEFAULT FALSE,
+    ALTER COLUMN advance_payment_paid SET DEFAULT FALSE;
+
+ALTER TABLE stakeholders
     ALTER COLUMN advance_payment_paid SET NOT NULL;
 
 ALTER TABLE stakeholders
-    ALTER COLUMN advance_payment_completed SET DEFAULT FALSE,
+    ALTER COLUMN advance_payment_completed SET DEFAULT FALSE;
+
+ALTER TABLE stakeholders
     ALTER COLUMN advance_payment_completed SET NOT NULL;
 
 CREATE INDEX IF NOT EXISTS idx_stakeholder_onboarding_status
@@ -66,7 +73,7 @@ ALTER TABLE business_applications
     ADD COLUMN IF NOT EXISTS onboarding_status VARCHAR(50);
 
 ALTER TABLE business_applications
-    ALTER COLUMN onboarding_status TYPE VARCHAR(50);
+    ALTER COLUMN onboarding_status TYPE VARCHAR(50) USING onboarding_status::VARCHAR(50);
 
 UPDATE business_applications ba
 SET onboarding_status = s.onboarding_status,
@@ -101,6 +108,9 @@ SET onboarding_status = CASE
     ELSE onboarding_status
 END;
 
+-- Fix: split SET DEFAULT and SET NOT NULL into separate statements to avoid ERROR 42601
 ALTER TABLE business_applications
-    ALTER COLUMN onboarding_status SET DEFAULT 'NEW',
+    ALTER COLUMN onboarding_status SET DEFAULT 'NEW';
+
+ALTER TABLE business_applications
     ALTER COLUMN onboarding_status SET NOT NULL;

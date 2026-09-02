@@ -29,11 +29,20 @@ SET final_endorsed = TRUE
 WHERE COALESCE(final_endorsed, FALSE) = FALSE
   AND COALESCE(endorsing_approved, FALSE) = TRUE;
 
+-- Fix: split multi-column ALTER TABLE into individual statements to avoid ERROR 42601
 ALTER TABLE stakeholders
-    ALTER COLUMN application_status SET DEFAULT 'PENDING',
-    ALTER COLUMN treasurer_approved SET DEFAULT FALSE,
-    ALTER COLUMN treasurer_approved SET NOT NULL,
-    ALTER COLUMN final_endorsed SET DEFAULT FALSE,
+    ALTER COLUMN application_status SET DEFAULT 'PENDING';
+
+ALTER TABLE stakeholders
+    ALTER COLUMN treasurer_approved SET DEFAULT FALSE;
+
+ALTER TABLE stakeholders
+    ALTER COLUMN treasurer_approved SET NOT NULL;
+
+ALTER TABLE stakeholders
+    ALTER COLUMN final_endorsed SET DEFAULT FALSE;
+
+ALTER TABLE stakeholders
     ALTER COLUMN final_endorsed SET NOT NULL;
 
 ALTER TABLE stalls
@@ -47,8 +56,11 @@ SET status = CASE
     ELSE 'AVAILABLE'
 END;
 
+-- Fix: split SET DEFAULT and SET NOT NULL into separate statements to avoid ERROR 42601
 ALTER TABLE stalls
-    ALTER COLUMN status SET DEFAULT 'AVAILABLE',
+    ALTER COLUMN status SET DEFAULT 'AVAILABLE';
+
+ALTER TABLE stalls
     ALTER COLUMN status SET NOT NULL;
 
 CREATE TABLE IF NOT EXISTS approval_history (
