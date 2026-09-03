@@ -93,7 +93,7 @@ public class SecurityConfig {
 
                         .requestMatchers(
                                 "/uploads/**"
-                        ).authenticated()
+                        ).permitAll()
 
                         .requestMatchers(
                                 "/api/reports/**",
