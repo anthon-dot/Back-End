@@ -67,6 +67,11 @@ public class SecurityConfig {
                                 "/api/auth/update-role/**"
                         ).hasAnyRole(ROLE_ADMIN)
 
+                        // All admin management endpoints — ADMIN only
+                        .requestMatchers(
+                                "/api/admin/**"
+                        ).hasAnyRole(ROLE_ADMIN)
+
                         .requestMatchers(
                                 "/api/auth/me"
                         ).authenticated()
