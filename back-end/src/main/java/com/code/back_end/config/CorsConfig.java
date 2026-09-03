@@ -29,7 +29,11 @@ public class CorsConfig {
                     .forEach(allowedOrigins::add);
         }
 
-        config.setAllowedOrigins(allowedOrigins);
+        if (allowedOrigins.isEmpty()) {
+            config.setAllowedOriginPatterns(List.of("*"));
+        } else {
+            config.setAllowedOrigins(allowedOrigins);
+        }
         config.setAllowedMethods(
                 List.of("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH")
         );
