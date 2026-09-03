@@ -30,7 +30,7 @@ public class ApplicationController {
             @RequestParam String contact,
             @RequestParam String email,
             @RequestParam String address,
-            @RequestParam Long selectedStallId,
+            @RequestParam(required = false) Long selectedStallId,
             @RequestParam MultipartFile idFile,
             @RequestParam MultipartFile letterFile
     ) throws IOException {

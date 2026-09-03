@@ -87,11 +87,13 @@ public class ApplicationService {
             );
         }
 
-        Stall selectedStall = stallRepository.findById(selectedStallId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Selected stall not found"));
-
-        if (selectedStall.getOccupant() != null || !"AVAILABLE".equalsIgnoreCase(selectedStall.getStatus())) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "Only existing vacant stalls can be selected");
+        Stall selectedStall = null;
+        if (selectedStallId != null) {
+            selectedStall = stallRepository.findById(selectedStallId)
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Selected stall not found"));
+            if (selectedStall.getOccupant() != null || !"AVAILABLE".equalsIgnoreCase(selectedStall.getStatus())) {
+                throw new ResponseStatusException(HttpStatus.CONFLICT, "Only existing vacant stalls can be selected");
+            }
         }
 
         BusinessApplication application = new BusinessApplication();
