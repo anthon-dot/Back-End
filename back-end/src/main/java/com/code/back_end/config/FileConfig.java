@@ -11,9 +11,13 @@ public class FileConfig
     public void addResourceHandlers(
             ResourceHandlerRegistry registry
     ) {
+        String uploadDir = java.nio.file.Paths.get("uploads").toAbsolutePath().normalize().toString();
+        if (!uploadDir.endsWith(java.io.File.separator)) {
+            uploadDir += java.io.File.separator;
+        }
 
         registry
-                .addResourceHandler("/uploads/**")
-                .addResourceLocations("file:uploads/");
+                .addResourceHandler("/uploads/**", "/api/uploads/**")
+                .addResourceLocations("file:" + uploadDir, "file:uploads/");
     }
 }

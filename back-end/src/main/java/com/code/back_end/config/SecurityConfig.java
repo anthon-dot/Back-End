@@ -92,7 +92,9 @@ public class SecurityConfig {
                         ).permitAll()
 
                         .requestMatchers(
-                                "/uploads/**"
+                                "/error",
+                                "/uploads/**",
+                                "/api/uploads/**"
                         ).permitAll()
 
                         .requestMatchers(
