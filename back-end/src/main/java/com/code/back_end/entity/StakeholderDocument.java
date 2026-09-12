@@ -124,4 +124,15 @@ public class StakeholderDocument {
         this.uploadedAt =
                 uploadedAt;
     }
+
+    @Transient
+    public String getFileUrl() {
+        if (filePath != null && (filePath.startsWith("http://") || filePath.startsWith("https://"))) {
+            return filePath;
+        }
+        if (fileName != null && !fileName.isBlank()) {
+            return "/uploads/" + fileName;
+        }
+        return filePath;
+    }
 }

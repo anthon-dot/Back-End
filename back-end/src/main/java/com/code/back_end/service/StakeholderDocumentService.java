@@ -47,7 +47,7 @@ public class StakeholderDocumentService {
             MultipartFile file
     ) throws IOException {
         String filePath = saveFile(file);
-        String fileName = new File(filePath).getName();
+        String fileName = extractFileName(filePath);
 
         StakeholderDocument doc = new StakeholderDocument();
         doc.setStakeholder(stakeholder);
@@ -70,7 +70,7 @@ public class StakeholderDocumentService {
 
         String documentType = normalizeDocumentType(type);
         String filePath = saveFile(file);
-        String fileName = new File(filePath).getName();
+        String fileName = extractFileName(filePath);
 
         List<StakeholderDocument> docs = documentRepo.findByStakeholder_Id(stakeholder.getId());
         StakeholderDocument existing = docs.stream()
@@ -133,5 +133,13 @@ public class StakeholderDocumentService {
             default:
                 throw new BadRequestException("Invalid document type: " + type);
         }
+    }
+
+    private String extractFileName(String filePath) {
+        if (filePath == null) {
+            return null;
+        }
+        int lastSlash = Math.max(filePath.lastIndexOf('/'), filePath.lastIndexOf('\\'));
+        return lastSlash >= 0 ? filePath.substring(lastSlash + 1) : filePath;
     }
 }

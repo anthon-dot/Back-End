@@ -114,13 +114,13 @@ public class ApplicationService {
         if (idFile != null && !idFile.isEmpty()) {
             String path = saveFile(idFile);
             application.setIdFilePath(path);
-            application.setIdFileName(new File(path).getName());
+            application.setIdFileName(extractFileName(path));
         }
 
         if (letterFile != null && !letterFile.isEmpty()) {
             String path = saveFile(letterFile);
             application.setLetterFilePath(path);
-            application.setLetterFileName(new File(path).getName());
+            application.setLetterFileName(extractFileName(path));
         }
 
         BusinessApplication saved = applicationRepository.save(application);
@@ -490,5 +490,13 @@ public class ApplicationService {
         document.setFileName(fileName);
         document.setFilePath(filePath);
         stakeholderDocumentRepository.save(document);
+    }
+
+    private String extractFileName(String filePath) {
+        if (filePath == null) {
+            return null;
+        }
+        int lastSlash = Math.max(filePath.lastIndexOf('/'), filePath.lastIndexOf('\\'));
+        return lastSlash >= 0 ? filePath.substring(lastSlash + 1) : filePath;
     }
 }

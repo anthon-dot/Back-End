@@ -2,13 +2,13 @@ package com.code.back_end.controller;
 
 import com.code.back_end.dto.StallDTO;
 import com.code.back_end.entity.Stall;
+import com.code.back_end.service.FileStorageService;
 import com.code.back_end.service.StallService;
 
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.nio.file.*;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -17,11 +17,14 @@ import java.util.stream.Collectors;
 public class StallController {
 
     private final StallService service;
+    private final FileStorageService fileStorageService;
 
     public StallController(
-            StallService service
+            StallService service,
+            FileStorageService fileStorageService
     ) {
         this.service = service;
+        this.fileStorageService = fileStorageService;
     }
 
     @GetMapping
@@ -65,35 +68,20 @@ public class StallController {
     ) {
 
         try {
-
-            String fileName =
-                    System.currentTimeMillis()
-                    + "_"
-                    + file.getOriginalFilename();
-
-            Path uploadPath =
-                    Paths.get("uploads");
-
-            if (!Files.exists(uploadPath)) {
-
-                Files.createDirectories(uploadPath);
+            String storedPath = fileStorageService.storeFile(file);
+            if (storedPath.startsWith("http://") || storedPath.startsWith("https://")) {
+                return ResponseEntity.ok(storedPath);
             }
 
-            Files.copy(
-                    file.getInputStream(),
-                    uploadPath.resolve(fileName),
-                    StandardCopyOption.REPLACE_EXISTING
-            );
-
-            return ResponseEntity.ok(
-                    "/uploads/" + fileName
-            );
+            int lastSlash = Math.max(storedPath.lastIndexOf('/'), storedPath.lastIndexOf('\\'));
+            String fileName = lastSlash >= 0 ? storedPath.substring(lastSlash + 1) : storedPath;
+            return ResponseEntity.ok("/uploads/" + fileName);
 
         } catch (Exception e) {
 
             return ResponseEntity
                     .badRequest()
-                    .body("Upload failed");
+                    .body("Upload failed: " + e.getMessage());
         }
     }
 }

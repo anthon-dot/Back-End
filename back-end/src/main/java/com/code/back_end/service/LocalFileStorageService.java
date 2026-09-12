@@ -90,7 +90,9 @@ public class LocalFileStorageService implements FileStorageService {
             throw new InvalidFileException("Cannot store file outside current directory");
         }
 
-        Files.copy(file.getInputStream(), targetPath, StandardCopyOption.REPLACE_EXISTING);
+        try (var in = file.getInputStream()) {
+            Files.copy(in, targetPath, StandardCopyOption.REPLACE_EXISTING);
+        }
         return targetPath.toString();
     }
 
@@ -100,8 +102,16 @@ public class LocalFileStorageService implements FileStorageService {
             return false;
         }
         try {
-            Path path = Paths.get(filePath).toAbsolutePath().normalize();
-            if (path.startsWith(this.uploadLocation)) {
+            Path path = Paths.get(filePath);
+            if (!path.isAbsolute()) {
+                path = this.uploadLocation.resolve(path);
+            }
+            path = path.toAbsolutePath().normalize();
+
+            Path target = this.uploadLocation.resolve(path.getFileName()).normalize();
+            if (Files.exists(target)) {
+                return Files.deleteIfExists(target);
+            } else if (Files.exists(path)) {
                 return Files.deleteIfExists(path);
             }
             return false;
