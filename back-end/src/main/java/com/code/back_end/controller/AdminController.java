@@ -1,10 +1,13 @@
 package com.code.back_end.controller;
 
 import com.code.back_end.entity.*;
+import com.code.back_end.exception.BadRequestException;
+import com.code.back_end.exception.DuplicateResourceException;
 import com.code.back_end.exception.ResourceNotFoundException;
 import com.code.back_end.repository.*;
 import com.code.back_end.security.SecurityService;
 import com.code.back_end.service.*;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
@@ -70,7 +73,66 @@ public class AdminController {
                 .collect(Collectors.toList());
     }
 
-    /** Update a user's role, status, email, contact — NOT password. */
+    /**
+     * Create a new user account with assigned role and credentials.
+     */
+    @PostMapping("/users")
+    public ResponseEntity<Map<String, Object>> createUser(@RequestBody Map<String, Object> payload) {
+        securityService.requireAdmin();
+
+        String username = payload.get("username") != null ? String.valueOf(payload.get("username")).trim() : "";
+        if (username.isBlank()) {
+            throw new BadRequestException("Username is required");
+        }
+        if (username.length() < 3 || username.length() > 80) {
+            throw new BadRequestException("Username must be between 3 and 80 characters");
+        }
+        if (userRepository.findByUsername(username).isPresent()) {
+            throw new DuplicateResourceException("Username already exists: " + username);
+        }
+
+        String rawPassword = payload.get("password") != null ? String.valueOf(payload.get("password")) : "";
+        if (rawPassword.isBlank()) {
+            rawPassword = generateTempPassword();
+        } else if (rawPassword.length() < 6) {
+            throw new BadRequestException("Password must be at least 6 characters");
+        }
+
+        String role = payload.get("role") != null ? String.valueOf(payload.get("role")).trim().toUpperCase() : "ADMIN";
+        if (role.startsWith("ROLE_")) {
+            role = role.substring(5);
+        }
+        if (role.isBlank()) {
+            role = "ADMIN";
+        }
+
+        String status = payload.get("status") != null ? String.valueOf(payload.get("status")).trim().toUpperCase() : "ACTIVE";
+        if (status.isBlank()) {
+            status = "ACTIVE";
+        }
+
+        User user = new User();
+        user.setUsername(username);
+        user.setPassword(passwordEncoder.encode(rawPassword));
+        user.setRole(role);
+        user.setStatus(status);
+        user.setCreatedAt(LocalDateTime.now());
+
+        if (payload.containsKey("name") && payload.get("name") != null) {
+            String name = String.valueOf(payload.get("name")).trim();
+            if (!name.isBlank()) {
+                user.setName(name);
+            }
+        }
+
+        User saved = userRepository.save(user);
+        auditLogService.log("CREATE_USER", "User", saved.getId(),
+                "Admin created user: " + saved.getUsername() + " with role: " + saved.getRole());
+
+        return ResponseEntity.status(HttpStatus.CREATED).body(toUserMap(saved));
+    }
+
+    /** Update a user's role, status, email, contact, name — NOT password. */
     @PutMapping("/users/{id}")
     public Map<String, Object> updateUser(
             @PathVariable Long id,
@@ -80,11 +142,18 @@ public class AdminController {
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found: " + id));
 
+        if (payload.containsKey("name") && payload.get("name") != null) {
+            user.setName(String.valueOf(payload.get("name")).trim());
+        }
         if (payload.containsKey("role") && payload.get("role") != null) {
-            user.setRole(String.valueOf(payload.get("role")));
+            String role = String.valueOf(payload.get("role")).trim().toUpperCase();
+            if (role.startsWith("ROLE_")) {
+                role = role.substring(5);
+            }
+            user.setRole(role);
         }
         if (payload.containsKey("status") && payload.get("status") != null) {
-            user.setStatus(String.valueOf(payload.get("status")));
+            user.setStatus(String.valueOf(payload.get("status")).trim().toUpperCase());
         }
 
         userRepository.save(user);
@@ -243,6 +312,7 @@ public class AdminController {
         Map<String, Object> map = new LinkedHashMap<>();
         map.put("id",        user.getId());
         map.put("username",  user.getUsername());
+        map.put("name",      user.getName() != null && !user.getName().isBlank() ? user.getName() : user.getUsername());
         map.put("role",      user.getRole());
         map.put("status",    user.getStatus() != null ? user.getStatus() : "ACTIVE");
         map.put("createdAt", user.getCreatedAt());

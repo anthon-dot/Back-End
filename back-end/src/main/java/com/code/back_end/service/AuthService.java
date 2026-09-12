@@ -6,6 +6,7 @@ import com.code.back_end.exception.ResourceNotFoundException;
 import com.code.back_end.repository.UserRepository;
 import com.code.back_end.util.JwtUtil;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
@@ -13,7 +14,9 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
@@ -44,11 +47,27 @@ public class AuthService implements UserDetailsService {
         User user = repo.findByUsername(username)
                 .orElseThrow(() -> new UsernameNotFoundException(INVALID_CREDENTIALS_MSG));
 
+        String rawRole = user.getRole();
+        String role = (rawRole != null && rawRole.startsWith("ROLE_"))
+                ? rawRole.substring(5)
+                : (rawRole != null ? rawRole : "STAKEHOLDER");
+
+        List<SimpleGrantedAuthority> authorities = new ArrayList<>();
+        authorities.add(new SimpleGrantedAuthority("ROLE_" + role));
+
+        com.code.back_end.enums.Role roleEnum = com.code.back_end.enums.Role.fromString(role);
+        if (roleEnum != null) {
+            String canonicalWithoutPrefix = roleEnum.roleWithoutPrefix();
+            if (!canonicalWithoutPrefix.equalsIgnoreCase(role)) {
+                authorities.add(new SimpleGrantedAuthority("ROLE_" + canonicalWithoutPrefix));
+            }
+        }
+
         return org.springframework.security.core.userdetails.User
                 .builder()
                 .username(user.getUsername())
                 .password(user.getPassword())
-                .authorities("ROLE_" + user.getRole())
+                .authorities(authorities)
                 .build();
     }
 
@@ -103,6 +122,18 @@ public class AuthService implements UserDetailsService {
                     "Login failed: invalid password"
             );
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, INVALID_CREDENTIALS_MSG);
+        }
+
+        if ("INACTIVE".equalsIgnoreCase(user.getStatus())) {
+            auditLogService.logAs(
+                    user,
+                    user.getRole(),
+                    "LOGIN_FAILED",
+                    "User",
+                    user.getId(),
+                    "Login failed: account is deactivated"
+            );
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Account is deactivated. Please contact an administrator.");
         }
 
         String token = jwt.generateToken(username, user.getRole());
