@@ -18,8 +18,10 @@ import com.code.back_end.security.SecurityService;
 import jakarta.transaction.Transactional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -449,6 +451,13 @@ public class PaymentService {
                 payment.getPaymentType()
                         == PaymentType.ADVANCE_PAYMENT
         ) {
+
+            if (!Boolean.TRUE.equals(stakeholder.getTreasurerApproved())) {
+                throw new ResponseStatusException(
+                        HttpStatus.BAD_REQUEST,
+                        "Stakeholder must be approved by the Treasurer before advance payment can be recorded"
+                );
+            }
 
             if (
                     payment.getTotalAdvanceAmount()
