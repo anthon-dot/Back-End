@@ -500,9 +500,14 @@ public class PaymentService {
                 stakeholder.setAdvancePaymentPaid(true);
                 stakeholder.setAdvancePaymentCompleted(true);
                 stakeholder.setAdvancePaymentDate(LocalDate.now());
+                stakeholder.setTreasurerApproved(true);
                 stakeholder.setOnboardingStatus(
                         "FOR_APPROVAL"
                 );
+                if ("PENDING_TREASURER_APPROVAL".equals(stakeholder.getApplicationStatus())
+                        || stakeholder.getApplicationStatus() == null) {
+                    stakeholder.setApplicationStatus("PENDING_MARKET_SUPERVISOR_APPROVAL");
+                }
 
             } else {
 

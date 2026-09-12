@@ -157,7 +157,7 @@ public class StakeholderController {
     @PostMapping("/{id}/treasurer-approve")
     public Stakeholder treasurerApprove(
             @PathVariable Long id,
-            @RequestBody TreasurerApprovalRequest request
+            @RequestBody(required = false) TreasurerApprovalRequest request
     ) {
         return approvalWorkflowService.approveByTreasurer(id, request);
     }

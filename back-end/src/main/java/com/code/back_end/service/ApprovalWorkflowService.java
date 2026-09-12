@@ -74,50 +74,53 @@ public class ApprovalWorkflowService {
     ) {
         securityService.requireTreasurerOrAdmin();
 
-        if (request.getAmount() == null || request.getAmount().compareTo(BigDecimal.ZERO) <= 0) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Advance payment amount is required");
-        }
-
         Stakeholder stakeholder = getStakeholder(stakeholderId);
 
         if (Boolean.TRUE.equals(stakeholder.getTreasurerApproved())) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Treasurer approval already recorded");
         }
 
-        BigDecimal totalAdvance =
-                request.getTotalAdvanceAmount() == null
-                        ? request.getAmount()
-                        : request.getTotalAdvanceAmount();
+        String historyNote;
+        if (request != null && request.getAmount() != null && request.getAmount().compareTo(BigDecimal.ZERO) > 0) {
+            BigDecimal totalAdvance =
+                    request.getTotalAdvanceAmount() == null
+                            ? request.getAmount()
+                            : request.getTotalAdvanceAmount();
 
-        Payment payment = new Payment();
-        payment.setStakeholder(stakeholder);
-        payment.setAmount(request.getAmount());
-        payment.setTotalAdvanceAmount(totalAdvance);
-        payment.setPaymentType(PaymentType.ADVANCE_PAYMENT);
-        payment.setReferenceNo(request.getReferenceNo());
-        payment.setReceiptNo(generateReceiptNo("ADV"));
-        payment.setPaymentDate(LocalDateTime.now());
-        paymentRepository.save(payment);
+            Payment payment = new Payment();
+            payment.setStakeholder(stakeholder);
+            payment.setAmount(request.getAmount());
+            payment.setTotalAdvanceAmount(totalAdvance);
+            payment.setPaymentType(PaymentType.ADVANCE_PAYMENT);
+            payment.setReferenceNo(request.getReferenceNo());
+            payment.setReceiptNo(generateReceiptNo("ADV"));
+            payment.setPaymentDate(LocalDateTime.now());
+            paymentRepository.save(payment);
 
-        BigDecimal currentCredit =
-                stakeholder.getAdvanceBalance() == null
-                        ? BigDecimal.ZERO
-                        : stakeholder.getAdvanceBalance();
+            BigDecimal currentCredit =
+                    stakeholder.getAdvanceBalance() == null
+                            ? BigDecimal.ZERO
+                            : stakeholder.getAdvanceBalance();
+
+            stakeholder.setAdvancePaymentPaid(true);
+            stakeholder.setAdvancePaymentCompleted(true);
+            stakeholder.setAdvancePaymentDate(LocalDate.now());
+            stakeholder.setTotalAdvanceAmount(totalAdvance);
+            stakeholder.setAdvancePaymentAmount(currentCredit.add(request.getAmount()));
+            stakeholder.setAdvanceBalance(currentCredit.add(request.getAmount()));
+            historyNote = "Advance payment recorded: " + payment.getReceiptNo();
+        } else {
+            historyNote = "Treasurer approved stakeholder application";
+        }
 
         stakeholder.setTreasurerApproved(true);
-        stakeholder.setAdvancePaymentPaid(true);
-        stakeholder.setAdvancePaymentCompleted(true);
-        stakeholder.setAdvancePaymentDate(LocalDate.now());
-        stakeholder.setTotalAdvanceAmount(totalAdvance);
-        stakeholder.setAdvancePaymentAmount(currentCredit.add(request.getAmount()));
-        stakeholder.setAdvanceBalance(currentCredit.add(request.getAmount()));
         stakeholder.setApplicationStatus("PENDING_MARKET_SUPERVISOR_APPROVAL");
         stakeholder.setOnboardingStatus("FOR_APPROVAL");
 
         Stakeholder saved = stakeholderRepository.save(stakeholder);
-        recordHistory(saved, "TREASURER", "APPROVED", "Advance payment recorded: " + payment.getReceiptNo());
-        notificationService.createNotification(saved, "Advance Payment Recorded", "Your advance payment has been recorded and sent to the Market Supervisor.");
-        auditLogService.log("TREASURER_APPROVED", "Stakeholder", saved.getId(), "Treasurer approved and recorded advance payment");
+        recordHistory(saved, "TREASURER", "APPROVED", historyNote);
+        notificationService.createNotification(saved, "Treasurer Approved", "Your application has been approved by the Treasurer and sent to the Market Supervisor.");
+        auditLogService.log("TREASURER_APPROVED", "Stakeholder", saved.getId(), "Treasurer approved stakeholder");
         syncApplication(saved);
         return saved;
     }

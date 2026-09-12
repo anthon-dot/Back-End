@@ -278,6 +278,7 @@ public class ApplicantApprovalService {
             );
         }
 
+        stakeholder.setTreasurerApproved(true);
         stakeholder.setMarketApprovalStatus("APPROVED");
         stakeholder.setEndorsementStatus("APPROVED");
         stakeholder.setBploStatus("APPROVED");
