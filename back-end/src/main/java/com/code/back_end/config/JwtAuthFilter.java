@@ -37,28 +37,21 @@ public class JwtAuthFilter
 
     // SKIP JWT FOR PUBLIC ROUTES
     @Override
-    protected boolean shouldNotFilter(
-            HttpServletRequest request
-    ) {
-
-        String path =
-                request.getServletPath();
+    protected boolean shouldNotFilter(HttpServletRequest request) {
+        String path = request.getServletPath();
 
         if ("OPTIONS".equalsIgnoreCase(request.getMethod())) {
             return true;
         }
 
-        return (
-        "/api/auth/login".equals(path)
+        return "/api/auth/login".equals(path)
                 || "/api/auth/register".equals(path)
-                || path.startsWith("/api/auth/update-role")
-)
-                || path.startsWith(
-                "/swagger-ui"
-        )
-                || path.startsWith(
-                "/v3/api-docs"
-        );
+                || "/api/health".equals(path)
+                || path.startsWith("/swagger-ui")
+                || path.startsWith("/v3/api-docs")
+                || path.startsWith("/error")
+                || path.startsWith("/uploads")
+                || path.startsWith("/api/uploads");
     }
 
     @Override
@@ -66,22 +59,12 @@ public class JwtAuthFilter
             HttpServletRequest request,
             HttpServletResponse response,
             FilterChain filterChain
-    ) throws ServletException,
-            IOException {
+    ) throws ServletException, IOException {
 
-        String header =
-                request.getHeader(
-                        HttpHeaders.AUTHORIZATION
-                );
+        String header = request.getHeader(HttpHeaders.AUTHORIZATION);
 
-        if (
-                header == null ||
-                !header.startsWith("Bearer ")
-        ) {
-            response.sendError(
-                    HttpServletResponse.SC_UNAUTHORIZED,
-                    "Missing bearer token"
-            );
+        if (header == null || !header.startsWith("Bearer ")) {
+            filterChain.doFilter(request, response);
             return;
         }
 
