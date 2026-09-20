@@ -559,8 +559,137 @@ app.post("/approval-workflow/reject", async (c) => {
   return c.json({ success: true, data: updated })
 })
 
-// Fallback for default invoke root
-app.all("/approval-workflow", (c) => {
+// ─── REGISTRATION & LOGIN RESOLVER (Bypasses email rate limit) ────────────────
+
+async function handleRegister(c: any) {
+  try {
+    const body = await c.req.json()
+    const rawUsername = String(body.username || "").trim()
+    const password = String(body.password || "")
+    const name = String(body.name || rawUsername).trim()
+    const role = String(body.role || "").toUpperCase()
+
+    if (!rawUsername || !password) {
+      return c.json({ error: "Username and password are required" }, 400)
+    }
+
+    if (password.length < 6) {
+      return c.json({ error: "Password must be at least 6 characters" }, 400)
+    }
+
+    // Determine the email address to use in Supabase Auth
+    let emailToUse = rawUsername
+    if (!rawUsername.includes("@")) {
+      const sanitized = rawUsername.toLowerCase().replace(/[^a-z0-9_.-]/g, "")
+      emailToUse = `${sanitized || "user"}@manticao.market`
+    }
+
+    const requestedRole = (rawUsername.toLowerCase() === "admin" || role === "ADMIN")
+      ? "ADMIN"
+      : (role || "STAKEHOLDER")
+
+    const supabase = getSupabaseClient()
+
+    // Create user with email_confirm = true (zero confirmation email sent, zero rate limit)
+    const { data: userData, error: createError } = await supabase.auth.admin.createUser({
+      email: emailToUse,
+      password: password,
+      email_confirm: true,
+      user_metadata: {
+        username: rawUsername,
+        name: name,
+        role: requestedRole
+      }
+    })
+
+    if (createError) {
+      if (createError.message?.toLowerCase().includes("already registered") || createError.message?.toLowerCase().includes("already exists")) {
+        return c.json({ error: "An account with this username or email already exists." }, 409)
+      }
+      return c.json({ error: createError.message }, 400)
+    }
+
+    const createdUser = userData.user
+
+    // Ensure profile is synced with active status
+    if (createdUser) {
+      await supabase.from("profiles").upsert({
+        id: createdUser.id,
+        username: rawUsername,
+        name: name,
+        role: requestedRole,
+        status: "ACTIVE"
+      })
+    }
+
+    return c.json({
+      success: true,
+      message: "Account created successfully",
+      email: emailToUse,
+      username: rawUsername,
+      role: requestedRole,
+      user: {
+        id: createdUser?.id,
+        email: emailToUse,
+        username: rawUsername,
+        role: requestedRole
+      }
+    })
+  } catch (err: any) {
+    return c.json({ error: err.message || "Failed to register user" }, 500)
+  }
+}
+
+async function handleResolveLogin(c: any) {
+  try {
+    const { identifier } = await c.req.json()
+    if (!identifier) {
+      return c.json({ error: "Identifier is required" }, 400)
+    }
+
+    const raw = String(identifier).trim()
+    if (raw.includes("@")) {
+      return c.json({ email: raw })
+    }
+
+    const supabase = getSupabaseClient()
+
+    // Check profiles by username
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("id, username")
+      .ilike("username", raw)
+      .maybeSingle()
+
+    if (profile) {
+      const { data: userData } = await supabase.auth.admin.getUserById(profile.id)
+      if (userData?.user?.email) {
+        return c.json({ email: userData.user.email })
+      }
+    }
+
+    // Default fallback to manticao.market
+    const sanitized = raw.toLowerCase().replace(/[^a-z0-9_.-]/g, "")
+    return c.json({ email: `${sanitized}@manticao.market` })
+  } catch (err: any) {
+    return c.json({ error: err.message || "Could not resolve identifier" }, 500)
+  }
+}
+
+app.post("/register", handleRegister)
+app.post("/approval-workflow/register", handleRegister)
+app.post("/resolve-login", handleResolveLogin)
+app.post("/approval-workflow/resolve-login", handleResolveLogin)
+
+// Fallback for default invoke root and action-based calls
+app.all("/approval-workflow", async (c) => {
+  if (c.req.method === "POST") {
+    try {
+      const cloned = await c.req.raw.clone().json()
+      if (cloned?.action === "register") return handleRegister(c)
+      if (cloned?.action === "resolve-login") return handleResolveLogin(c)
+    } catch (_) {}
+  }
   return c.json({ message: "Approval Workflow Edge Function Active. Use specific route endpoints." })
 })
 
