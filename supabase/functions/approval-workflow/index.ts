@@ -676,18 +676,76 @@ async function handleResolveLogin(c: any) {
   }
 }
 
+async function handleUpdatePassword(c: any) {
+  try {
+    const body = await c.req.json()
+    const userId = body.userId || body.id
+    const newPassword = body.newPassword || body.password
+
+    if (!userId || !newPassword) {
+      return c.json({ error: "User ID and new password are required" }, 400)
+    }
+
+    if (String(newPassword).length < 6) {
+      return c.json({ error: "Password must be at least 6 characters" }, 400)
+    }
+
+    const supabase = getSupabaseClient()
+    const { error } = await supabase.auth.admin.updateUserById(userId, {
+      password: String(newPassword)
+    })
+
+    if (error) {
+      return c.json({ error: error.message }, 400)
+    }
+
+    return c.json({ success: true, message: "Password updated successfully" })
+  } catch (err: any) {
+    return c.json({ error: err.message || "Failed to update password" }, 500)
+  }
+}
+
+async function handleDeleteUser(c: any) {
+  try {
+    const body = await c.req.json()
+    const userId = body.userId || body.id
+
+    if (!userId) {
+      return c.json({ error: "User ID is required" }, 400)
+    }
+
+    const supabase = getSupabaseClient()
+    const { error } = await supabase.auth.admin.deleteUser(userId)
+
+    if (error) {
+      return c.json({ error: error.message }, 400)
+    }
+
+    await supabase.from("profiles").delete().eq("id", userId)
+    return c.json({ success: true, message: "User deleted successfully" })
+  } catch (err: any) {
+    return c.json({ error: err.message || "Failed to delete user" }, 500)
+  }
+}
+
 app.post("/register", handleRegister)
 app.post("/approval-workflow/register", handleRegister)
 app.post("/resolve-login", handleResolveLogin)
 app.post("/approval-workflow/resolve-login", handleResolveLogin)
+app.post("/update-password", handleUpdatePassword)
+app.post("/approval-workflow/update-password", handleUpdatePassword)
+app.post("/delete-user", handleDeleteUser)
+app.post("/approval-workflow/delete-user", handleDeleteUser)
 
 // Fallback for default invoke root and action-based calls
 app.all("/approval-workflow", async (c) => {
   if (c.req.method === "POST") {
     try {
       const cloned = await c.req.raw.clone().json()
-      if (cloned?.action === "register") return handleRegister(c)
-      if (cloned?.action === "resolve-login") return handleResolveLogin(c)
+      if (cloned?.action === "register" || cloned?.action === "createUser") return handleRegister(c)
+      if (cloned?.action === "resolve-login" || cloned?.action === "resolveLogin") return handleResolveLogin(c)
+      if (cloned?.action === "update-password" || cloned?.action === "resetPassword") return handleUpdatePassword(c)
+      if (cloned?.action === "delete-user" || cloned?.action === "deleteUser") return handleDeleteUser(c)
     } catch (_) {}
   }
   return c.json({ message: "Approval Workflow Edge Function Active. Use specific route endpoints." })
