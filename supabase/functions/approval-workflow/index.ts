@@ -294,6 +294,61 @@ async function handleAssignStall(c: any) {
   return c.json({ success: true, data: updatedStakeholder, contract, occupant })
 }
 
+// ─── MARKET SUPERVISOR APPROVE (Only approve, without stall assignment) ───────
+async function handleMarketSupervisorApprove(c: any) {
+  const auth = await authenticateCaller(c, ["MARKET_SUPERVISOR", "ADMIN"])
+  if (auth.error) return c.json({ error: auth.error }, auth.status)
+
+  const { supabase, profile } = auth
+  const body = await c.req.json()
+  const { stakeholderId, remarks } = body
+
+  if (!stakeholderId) {
+    return c.json({ error: "stakeholderId is required" }, 400)
+  }
+
+  const { data: updated, error: stUpdErr } = await supabase
+    .from("stakeholders")
+    .update({
+      market_supervisor_approved: true,
+      market_approval_status: "APPROVED",
+      application_status: "PENDING_BPLO_APPROVAL",
+    })
+    .eq("id", stakeholderId)
+    .select()
+    .single()
+
+  if (stUpdErr) return c.json({ error: stUpdErr.message }, 500)
+
+  await Promise.all([
+    supabase.from("approval_history").insert({
+      stakeholder_id: stakeholderId,
+      stage: "MARKET_SUPERVISOR",
+      status: "APPROVED",
+      approved_by: profile.id,
+      remarks: remarks || "Market Supervisor approved application",
+    }),
+    supabase.from("notifications").insert({
+      stakeholder_id: stakeholderId,
+      title: "Market Supervisor Approved",
+      message: "Your application has been approved by the Market Supervisor and forwarded to BPLO.",
+      priority: "MEDIUM",
+      notification_type: "APPROVAL_UPDATE",
+      related_record_type: "STAKEHOLDER",
+      related_record_id: stakeholderId,
+    }),
+    supabase.from("audit_logs").insert({
+      action: "MARKET_SUPERVISOR_APPROVED",
+      entity_name: "Stakeholder",
+      entity_id: stakeholderId,
+      performed_by: profile.email,
+      details: `Market Supervisor approved stakeholder ${stakeholderId}`,
+    }),
+  ])
+
+  return c.json({ success: true, data: updated })
+}
+
 // ==============================================================================
 // 3. BPLO APPROVAL (Business Permit Validation)
 // ==============================================================================
@@ -747,6 +802,8 @@ async function handleDeleteUser(c: any) {
 // Approval workflow routes
 app.post("/treasurer-approve", handleTreasurerApprove)
 app.post("/approval-workflow/treasurer-approve", handleTreasurerApprove)
+app.post("/market-approve", handleMarketSupervisorApprove)
+app.post("/approval-workflow/market-approve", handleMarketSupervisorApprove)
 app.post("/assign-stall", handleAssignStall)
 app.post("/approval-workflow/assign-stall", handleAssignStall)
 app.post("/bplo-approve", handleBploApprove)
@@ -776,6 +833,7 @@ async function dispatchAction(c: any) {
       const cloned = await c.req.raw.clone().json()
       const act = cloned?.action || ""
       if (act === "treasurer-approve" || act === "treasurerApprove") return handleTreasurerApprove(c)
+      if (act === "market-approve" || act === "marketApprove" || act === "supervisor-approve") return handleMarketSupervisorApprove(c)
       if (act === "assign-stall" || act === "assignStall") return handleAssignStall(c)
       if (act === "bplo-approve" || act === "bploApprove") return handleBploApprove(c)
       if (act === "final-endorse" || act === "finalEndorse" || act === "endorse") return handleFinalEndorse(c)
