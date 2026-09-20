@@ -42,16 +42,32 @@ async function authenticateCaller(c: any, allowedRoles: string[]) {
 
   const { data: profile, error: profileError } = await supabase
     .from("profiles")
-    .select("id, email, full_name, role")
+    .select("id, name, role, username")
     .eq("id", user.id)
-    .single()
+    .maybeSingle()
 
   if (profileError || !profile) {
     return { error: "User profile not found", status: 403 }
   }
 
-  const userRole = (profile.role || "").toUpperCase()
-  const hasAccess = allowedRoles.map(r => r.toUpperCase()).includes(userRole) || userRole === "ADMIN"
+  // Populate email & full_name from auth user & profile
+  profile.email = user.email || ""
+  profile.full_name = profile.name || user.user_metadata?.full_name || user.user_metadata?.name || profile.username || ""
+
+  const roleRaw = (profile.role || user.user_metadata?.role || "").toUpperCase()
+  // Map common aliases
+  let userRole = roleRaw
+  if (userRole === "SUPERVISOR") userRole = "MARKET_SUPERVISOR"
+  if (userRole === "BPLO_OFFICE") userRole = "BPLO"
+
+  const normalizedAllowed = allowedRoles.map(r => {
+    const up = r.toUpperCase()
+    if (up === "SUPERVISOR") return "MARKET_SUPERVISOR"
+    if (up === "BPLO_OFFICE") return "BPLO"
+    return up
+  })
+
+  const hasAccess = normalizedAllowed.includes(userRole) || userRole === "ADMIN"
 
   if (!hasAccess) {
     return { error: `Forbidden: Requires one of [${allowedRoles.join(", ")}]`, status: 403 }
@@ -63,7 +79,7 @@ async function authenticateCaller(c: any, allowedRoles: string[]) {
 // ==============================================================================
 // 1. TREASURER APPROVAL (Advance Payment Recording)
 // ==============================================================================
-app.post("/approval-workflow/treasurer-approve", async (c) => {
+async function handleTreasurerApprove(c: any) {
   const auth = await authenticateCaller(c, ["TREASURER", "ADMIN"])
   if (auth.error) return c.json({ error: auth.error }, auth.status)
 
@@ -161,12 +177,12 @@ app.post("/approval-workflow/treasurer-approve", async (c) => {
   ])
 
   return c.json({ success: true, data: updated })
-})
+}
 
 // ==============================================================================
 // 2. MARKET SUPERVISOR APPROVAL (Stall Assignment & Contract Generation)
 // ==============================================================================
-app.post("/approval-workflow/assign-stall", async (c) => {
+async function handleAssignStall(c: any) {
   const auth = await authenticateCaller(c, ["MARKET_SUPERVISOR", "ADMIN"])
   if (auth.error) return c.json({ error: auth.error }, auth.status)
 
@@ -276,12 +292,12 @@ app.post("/approval-workflow/assign-stall", async (c) => {
   ])
 
   return c.json({ success: true, data: updatedStakeholder, contract, occupant })
-})
+}
 
 // ==============================================================================
 // 3. BPLO APPROVAL (Business Permit Validation)
 // ==============================================================================
-app.post("/approval-workflow/bplo-approve", async (c) => {
+async function handleBploApprove(c: any) {
   const auth = await authenticateCaller(c, ["BPLO", "ADMIN"])
   if (auth.error) return c.json({ error: auth.error }, auth.status)
 
@@ -336,12 +352,12 @@ app.post("/approval-workflow/bplo-approve", async (c) => {
   ])
 
   return c.json({ success: true, data: updated })
-})
+}
 
 // ==============================================================================
 // 4. FINAL ENDORSEMENT (Mayor / Endorsement Office)
 // ==============================================================================
-app.post("/approval-workflow/final-endorse", async (c) => {
+async function handleFinalEndorse(c: any) {
   const auth = await authenticateCaller(c, ["ENDORSING_OFFICE", "ENDORSEMENT_OFFICE", "ADMIN"])
   if (auth.error) return c.json({ error: auth.error }, auth.status)
 
@@ -399,12 +415,12 @@ app.post("/approval-workflow/final-endorse", async (c) => {
   ])
 
   return c.json({ success: true, data: updated })
-})
+}
 
 // ==============================================================================
 // 5. PERMIT PAYMENT & ACTIVATION (Tenant Onboarding Complete)
 // ==============================================================================
-app.post("/approval-workflow/permit-payment", async (c) => {
+async function handlePermitPayment(c: any) {
   const auth = await authenticateCaller(c, ["TREASURER", "ADMIN"])
   if (auth.error) return c.json({ error: auth.error }, auth.status)
 
@@ -490,12 +506,12 @@ app.post("/approval-workflow/permit-payment", async (c) => {
   ])
 
   return c.json({ success: true, data: updated, receiptNo })
-})
+}
 
 // ==============================================================================
 // 6. REJECT APPLICATION
 // ==============================================================================
-app.post("/approval-workflow/reject", async (c) => {
+async function handleReject(c: any) {
   const auth = await authenticateCaller(c, ["ADMIN", "TREASURER", "MARKET_SUPERVISOR", "BPLO", "ENDORSING_OFFICE"])
   if (auth.error) return c.json({ error: auth.error }, auth.status)
 
@@ -557,7 +573,7 @@ app.post("/approval-workflow/reject", async (c) => {
   ])
 
   return c.json({ success: true, data: updated })
-})
+}
 
 // ─── REGISTRATION & LOGIN RESOLVER (Bypasses email rate limit) ────────────────
 
@@ -728,6 +744,23 @@ async function handleDeleteUser(c: any) {
   }
 }
 
+// Approval workflow routes
+app.post("/treasurer-approve", handleTreasurerApprove)
+app.post("/approval-workflow/treasurer-approve", handleTreasurerApprove)
+app.post("/assign-stall", handleAssignStall)
+app.post("/approval-workflow/assign-stall", handleAssignStall)
+app.post("/bplo-approve", handleBploApprove)
+app.post("/approval-workflow/bplo-approve", handleBploApprove)
+app.post("/final-endorse", handleFinalEndorse)
+app.post("/approval-workflow/final-endorse", handleFinalEndorse)
+app.post("/endorse", handleFinalEndorse)
+app.post("/approval-workflow/endorse", handleFinalEndorse)
+app.post("/permit-payment", handlePermitPayment)
+app.post("/approval-workflow/permit-payment", handlePermitPayment)
+app.post("/reject", handleReject)
+app.post("/approval-workflow/reject", handleReject)
+
+// User management routes
 app.post("/register", handleRegister)
 app.post("/approval-workflow/register", handleRegister)
 app.post("/resolve-login", handleResolveLogin)
@@ -737,18 +770,27 @@ app.post("/approval-workflow/update-password", handleUpdatePassword)
 app.post("/delete-user", handleDeleteUser)
 app.post("/approval-workflow/delete-user", handleDeleteUser)
 
-// Fallback for default invoke root and action-based calls
-app.all("/approval-workflow", async (c) => {
+async function dispatchAction(c: any) {
   if (c.req.method === "POST") {
     try {
       const cloned = await c.req.raw.clone().json()
-      if (cloned?.action === "register" || cloned?.action === "createUser") return handleRegister(c)
-      if (cloned?.action === "resolve-login" || cloned?.action === "resolveLogin") return handleResolveLogin(c)
-      if (cloned?.action === "update-password" || cloned?.action === "resetPassword") return handleUpdatePassword(c)
-      if (cloned?.action === "delete-user" || cloned?.action === "deleteUser") return handleDeleteUser(c)
+      const act = cloned?.action || ""
+      if (act === "treasurer-approve" || act === "treasurerApprove") return handleTreasurerApprove(c)
+      if (act === "assign-stall" || act === "assignStall") return handleAssignStall(c)
+      if (act === "bplo-approve" || act === "bploApprove") return handleBploApprove(c)
+      if (act === "final-endorse" || act === "finalEndorse" || act === "endorse") return handleFinalEndorse(c)
+      if (act === "permit-payment" || act === "permitPayment") return handlePermitPayment(c)
+      if (act === "reject") return handleReject(c)
+      if (act === "register" || act === "createUser") return handleRegister(c)
+      if (act === "resolve-login" || act === "resolveLogin") return handleResolveLogin(c)
+      if (act === "update-password" || act === "resetPassword") return handleUpdatePassword(c)
+      if (act === "delete-user" || act === "deleteUser") return handleDeleteUser(c)
     } catch (_) {}
   }
-  return c.json({ message: "Approval Workflow Edge Function Active. Use specific route endpoints." })
-})
+  return c.json({ message: "Approval Workflow Edge Function Active." })
+}
+
+app.all("/approval-workflow", dispatchAction)
+app.all("/", dispatchAction)
 
 Deno.serve(app.fetch)
