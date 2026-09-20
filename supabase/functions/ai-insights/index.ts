@@ -1,98 +1,162 @@
 // Supabase Edge Function: ai-insights
-// Replaces NotificationAIService.java and ReportAIService.java
-// Generates intelligent administrative recommendations using Google Gemini
+// Built with TypeScript & Hono framework
+// Replaces NotificationAIService.java and ReportAIService.java using Google Gemini for automated market intelligence
 
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2"
+import { Hono } from "npm:hono"
+import { cors } from "npm:hono/cors"
+import { createClient } from "npm:@supabase/supabase-js@2"
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+const app = new Hono()
+
+app.use(
+  "*",
+  cors({
+    origin: "*",
+    allowHeaders: ["authorization", "x-client-info", "apikey", "content-type"],
+    allowMethods: ["POST", "GET", "OPTIONS"],
+  })
+)
+
+function getSupabaseClient() {
+  const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? ""
+  const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
+  return createClient(supabaseUrl, serviceRoleKey)
 }
 
-serve(async (req) => {
-  if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders })
+// Fetch live market data snapshot
+async function fetchMarketSnapshot(supabase: any) {
+  const [
+    { count: totalStalls },
+    { count: occupiedStalls },
+    { data: overdueBillings },
+    { data: pendingApplications },
+    { data: activeContracts },
+  ] = await Promise.all([
+    supabase.from("stalls").select("*", { count: "exact", head: true }),
+    supabase.from("stalls").select("*", { count: "exact", head: true }).eq("status", "OCCUPIED"),
+    supabase.from("billings").select("id, billing_no, balance, due_date").eq("status", "OVERDUE"),
+    supabase.from("stakeholders").select("id, business_name, application_status").eq("application_status", "FOR_APPROVAL"),
+    supabase.from("contracts").select("id, contract_no, end_date").eq("status", "ACTIVE"),
+  ])
+
+  const total = totalStalls || 0
+  const occupied = occupiedStalls || 0
+  const occupancyRate = total > 0 ? ((occupied / total) * 100).toFixed(1) + "%" : "0%"
+  const totalOverdue = overdueBillings?.reduce((sum: number, b: any) => sum + Number(b.balance || 0), 0) || 0
+
+  return {
+    totalStalls: total,
+    occupiedStalls: occupied,
+    vacantStalls: Math.max(0, total - occupied),
+    occupancyRate,
+    overdueInvoicesCount: overdueBillings?.length || 0,
+    totalOverdueBalance: totalOverdue,
+    pendingApplicationsCount: pendingApplications?.length || 0,
+    activeContractsCount: activeContracts?.length || 0,
+  }
+}
+
+// Call Google Gemini API
+async function generateGeminiInsight(prompt: string, marketData: any, apiKey: string) {
+  if (!apiKey) {
+    return `Market Occupancy stands at ${marketData.occupancyRate} with ${marketData.occupiedStalls}/${marketData.totalStalls} stalls leased. Overdue balance totals PHP ${marketData.totalOverdueBalance.toLocaleString()}. (Set GEMINI_API_KEY for deep AI analysis).`
   }
 
+  const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`
+
+  const response = await fetch(endpoint, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      contents: [
+        {
+          parts: [
+            {
+              text: `You are an expert economic advisor and municipal market management consultant for Manticao Public Market.
+Data snapshot:
+${JSON.stringify(marketData, null, 2)}
+
+User request:
+${prompt}
+
+Provide a concise, professional executive briefing highlighting key operational risks, revenue collection opportunities, and 3 actionable administrative recommendations. Keep it under 250 words.`,
+            },
+          ],
+        },
+      ],
+    }),
+  })
+
+  if (!response.ok) {
+    const errorText = await response.text()
+    throw new Error(`Gemini API error: ${errorText}`)
+  }
+
+  const data = await response.json()
+  return data.candidates?.[0]?.content?.parts?.[0]?.text || "Unable to generate insights at this time."
+}
+
+// ==============================================================================
+// 1. GET /ai-insights/summary - Automated Market Briefing
+// ==============================================================================
+app.get("/ai-insights/summary", async (c) => {
   try {
-    const supabaseClient = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-    )
+    const supabase = getSupabaseClient()
+    const geminiKey = Deno.env.get("GEMINI_API_KEY") || ""
 
-    const GEMINI_API_KEY = Deno.env.get('GEMINI_API_KEY') || ''
+    const snapshot = await fetchMarketSnapshot(supabase)
+    const prompt = "Generate a daily administrative briefing summarizing market occupancy, overdue collections, and urgent action items."
+    const insight = await generateGeminiInsight(prompt, snapshot, geminiKey)
 
-    // 1. Fetch current market summary statistics
-    const [
-      { count: totalStalls },
-      { count: occupiedStalls },
-      { data: overdueBillings },
-      { data: pendingApplications }
-    ] = await Promise.all([
-      supabaseClient.from('stalls').select('*', { count: 'exact', head: true }),
-      supabaseClient.from('stalls').select('*', { count: 'exact', head: true }).eq('status', 'OCCUPIED'),
-      supabaseClient.from('billings').select('id, billing_no, balance, due_date, occupant_id').eq('status', 'UNPAID'),
-      supabaseClient.from('business_applications').select('id, business_name, application_status, applied_on').eq('application_status', 'PENDING')
-    ])
-
-    const marketSummary = {
-      totalStalls: totalStalls || 0,
-      occupiedStalls: occupiedStalls || 0,
-      occupancyRate: totalStalls ? (((occupiedStalls || 0) / totalStalls) * 100).toFixed(1) + '%' : '0%',
-      overdueInvoicesCount: overdueBillings?.length || 0,
-      totalOverdueBalance: overdueBillings?.reduce((sum, b) => sum + Number(b.balance || 0), 0) || 0,
-      pendingApplicationsCount: pendingApplications?.length || 0
-    }
-
-    let aiInsightText = "AI analysis skipped (GEMINI_API_KEY not configured)."
-
-    // 2. Call Gemini API if key is present
-    if (GEMINI_API_KEY) {
-      const prompt = `
-You are an intelligent Generative AI assistant for the Public Market Stall Management System of Manticao.
-Analyze the following market statistics:
-${JSON.stringify(marketSummary, null, 2)}
-
-Provide a concise, professional executive briefing:
-1. Operational Risk Assessment (e.g. overdue balances, occupancy)
-2. Revenue Opportunities
-3. Immediate actionable recommendations for market administrators.
-
-Keep response structured, concise, and professional.
-`
-      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: prompt }] }]
-        })
-      })
-
-      if (response.ok) {
-        const json = await response.json()
-        aiInsightText = json?.candidates?.[0]?.content?.parts?.[0]?.text || "No insight generated."
-      }
-    }
-
-    // 3. Save as an administrative notification
-    await supabaseClient.from('notifications').insert({
-      title: 'Weekly AI Market Intelligence Briefing',
-      message: `Occupancy at ${marketSummary.occupancyRate} with ${marketSummary.pendingApplicationsCount} pending applications and ${marketSummary.overdueInvoicesCount} overdue bills.`,
-      explanation: aiInsightText,
-      priority: marketSummary.overdueInvoicesCount > 5 ? 'HIGH' : 'MEDIUM',
-      notification_type: 'AI_INSIGHT',
-      ai_generated: true
+    return c.json({
+      success: true,
+      timestamp: new Date().toISOString(),
+      marketSnapshot: snapshot,
+      aiAnalysis: insight,
     })
-
-    return new Response(JSON.stringify({ success: true, summary: marketSummary, insight: aiInsightText }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      status: 200
-    })
-  } catch (err) {
-    return new Response(JSON.stringify({ error: err.message }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      status: 400
-    })
+  } catch (error: any) {
+    return c.json({ error: error.message }, 500)
   }
 })
+
+// ==============================================================================
+// 2. POST /ai-insights/generate - Custom Executive Report
+// ==============================================================================
+app.post("/ai-insights/generate", async (c) => {
+  try {
+    const supabase = getSupabaseClient()
+    const geminiKey = Deno.env.get("GEMINI_API_KEY") || ""
+    const { prompt } = await c.req.json()
+
+    if (!prompt) {
+      return c.json({ error: "Prompt is required" }, 400)
+    }
+
+    const snapshot = await fetchMarketSnapshot(supabase)
+    const insight = await generateGeminiInsight(prompt, snapshot, geminiKey)
+
+    // Save generated report to notifications or audit log
+    await supabase.from("notifications").insert({
+      title: "AI Market Report Generated",
+      message: insight.slice(0, 300) + "...",
+      priority: "MEDIUM",
+      notification_type: "AI_INSIGHT",
+    })
+
+    return c.json({
+      success: true,
+      prompt,
+      report: insight,
+      snapshot,
+    })
+  } catch (error: any) {
+    return c.json({ error: error.message }, 500)
+  }
+})
+
+app.all("/ai-insights", async (c) => {
+  // Alias for root invocation
+  return app.request("/ai-insights/summary", c.req.raw)
+})
+
+Deno.serve(app.fetch)

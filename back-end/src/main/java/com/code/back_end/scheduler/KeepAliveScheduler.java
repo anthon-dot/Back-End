@@ -9,11 +9,12 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestTemplate;
 
 /**
- * Keeps the Render free-tier service alive by self-pinging /api/health
- * every 14 minutes. This bean is only active with the render Spring profile.
+ * Legacy Render keep-alive scheduler.
+ * @deprecated Render deployment has been migrated to a Supabase-only architecture.
+ * This class is retained only for historical reference and is disabled by default.
  */
 @Component
-@Profile("render")
+@Profile("legacy-render")
 public class KeepAliveScheduler {
 
     private static final Logger log =

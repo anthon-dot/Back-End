@@ -35,8 +35,7 @@ public class AuthRateLimitFilter extends OncePerRequestFilter {
     protected void doFilterInternal(
             HttpServletRequest request,
             HttpServletResponse response,
-            FilterChain filterChain
-    ) throws ServletException, IOException {
+            FilterChain filterChain) throws ServletException, IOException {
         String key = request.getRequestURI() + ":" + clientIp(request);
 
         if (!allowRequest(key)) {

@@ -1,0 +1,41 @@
+name: Deploy to Supabase
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'supabase/**'
+      - '.github/workflows/deploy-supabase.yml'
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      PROJECT_ID: ${{ secrets.SUPABASE_PROJECT_ID || 'uzykxxphunglcwojoqtf' }}
+      DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Link Project
+        run: |
+          supabase link --project-ref "$PROJECT_ID" --password "$DB_PASSWORD"
+
+      - name: Apply Database Migrations
+        run: |
+          supabase db push
+
+      - name: Deploy Edge Functions
+        run: |
+          supabase functions deploy approval-workflow --no-verify-jwt
+          supabase functions deploy ai-insights --no-verify-jwt

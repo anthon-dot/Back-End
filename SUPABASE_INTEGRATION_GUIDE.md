@@ -225,20 +225,79 @@ export function subscribeToNotifications(stakeholderId, onNewNotification) {
 
 ---
 
-### F. Triggering Supabase Edge Functions
-*Old: Calling complex multi-stage Java endpoints*
+### F. Triggering Supabase Edge Functions (Hono-Powered)
+*Replaces complex multi-stage Java service workflows and AI report generators.*
 
+#### 1. Treasurer Approval (Advance Payment)
 ```javascript
-export async function approveStage(stakeholderId, stage, status, remarks) {
-  const { data, error } = await supabase.functions.invoke('approval-workflow', {
-    body: {
-      stakeholderId,
-      stage,
-      status,
-      remarks
-    }
+export async function treasurerApprove({ stakeholderId, amount, totalAdvanceAmount, referenceNo }) {
+  const { data, error } = await supabase.functions.invoke('approval-workflow/treasurer-approve', {
+    body: { stakeholderId, amount, totalAdvanceAmount, referenceNo }
   })
+  if (error) throw error
+  return data
+}
+```
 
+#### 2. Stall Assignment & Lease Contract Creation
+```javascript
+export async function assignStallAndContract({ stakeholderId, stallId, startDate, endDate, terms }) {
+  const { data, error } = await supabase.functions.invoke('approval-workflow/assign-stall', {
+    body: { stakeholderId, stallId, startDate, endDate, terms }
+  })
+  if (error) throw error
+  return data
+}
+```
+
+#### 3. BPLO Approval
+```javascript
+export async function bploApprove({ stakeholderId, remarks }) {
+  const { data, error } = await supabase.functions.invoke('approval-workflow/bplo-approve', {
+    body: { stakeholderId, remarks }
+  })
+  if (error) throw error
+  return data
+}
+```
+
+#### 4. Final Endorsement
+```javascript
+export async function finalEndorse({ stakeholderId, remarks }) {
+  const { data, error } = await supabase.functions.invoke('approval-workflow/final-endorse', {
+    body: { stakeholderId, remarks }
+  })
+  if (error) throw error
+  return data
+}
+```
+
+#### 5. Permit Payment & Tenant Activation
+```javascript
+export async function permitPaymentAndActivate({ stakeholderId, amount, referenceNo }) {
+  const { data, error } = await supabase.functions.invoke('approval-workflow/permit-payment', {
+    body: { stakeholderId, amount, referenceNo }
+  })
+  if (error) throw error
+  return data
+}
+```
+
+#### 6. Reject Application
+```javascript
+export async function rejectApplication({ stakeholderId, stage, remarks }) {
+  const { data, error } = await supabase.functions.invoke('approval-workflow/reject', {
+    body: { stakeholderId, stage, remarks }
+  })
+  if (error) throw error
+  return data
+}
+```
+
+#### 7. AI Market Intelligence Briefing (Google Gemini)
+```javascript
+export async function getMarketAIBriefing() {
+  const { data, error } = await supabase.functions.invoke('ai-insights/summary')
   if (error) throw error
   return data
 }
@@ -246,11 +305,24 @@ export async function approveStage(stakeholderId, stage, status, remarks) {
 
 ---
 
-## 4. Deploying Edge Functions (Optional CLI step)
+## 4. Deployment via CLI or GitHub Actions
 
-If you use the Supabase CLI:
+### Using NPM Scripts (Local CLI):
 ```bash
-npx supabase login
-npx supabase link --project-ref <your-project-id>
-npx supabase functions deploy approval-workflow
+# 1. Login and link project
+npm run supabase:login
+npm run supabase:link
+
+# 2. Push all database migrations
+npm run supabase:db:push
+
+# 3. Deploy all Edge Functions (approval-workflow + ai-insights)
+npm run supabase:functions:deploy
+
+# Or deploy everything at once:
+npm run supabase:deploy
 ```
+
+### Automated CI/CD (GitHub Actions):
+Any push to `main` triggers `.github/workflows/deploy-supabase.yml` automatically deploying migrations and edge functions.
+

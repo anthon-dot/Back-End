@@ -2,13 +2,16 @@
 
 Spring Boot backend for the rental management system.
 
+> [!NOTE]
+> **Architecture Note:** Production deployment for this application has migrated to a **Supabase-Only Architecture** (Supabase Auth, PostgreSQL with Row Level Security, Supabase Storage, and Deno/Hono Edge Functions). See the root [`README.md`](../README.md) and [`SUPABASE_INTEGRATION_GUIDE.md`](../SUPABASE_INTEGRATION_GUIDE.md) for full serverless details.
+
 ## Requirements
 
 - Java 21
 - Maven wrapper included in this repository
 - Supabase PostgreSQL connection details
 
-## Local Development
+## Local Development (Java Mode)
 
 Set the required environment variables before starting the app:
 
@@ -32,48 +35,17 @@ Then run:
 
 The app runs locally on `http://localhost:8083` unless `PORT` is set.
 
-## Render Deployment
+## Supabase-Only Deployment
 
-This repository includes a root-level `render.yaml` for a Render web service. Render's current Blueprint native runtimes do not include Java, so this project deploys the Spring Boot app as a Docker web service using Java 21.
+Production is deployed directly on Supabase without requiring a middleman Docker/Render web server:
 
-The Docker build uses the Maven wrapper:
-
-```bash
-./mvnw clean package -DskipTests
-```
-
-The container starts the packaged Spring Boot jar:
-
-```bash
-java -jar app.jar
-```
-
-Configure these Render environment variables:
-
-```text
-DATABASE_URL=jdbc:postgresql://your-supabase-host:5432/postgres
-DATABASE_USERNAME=your-supabase-username
-DATABASE_PASSWORD=your-supabase-password
-JWT_SECRET=replace-with-at-least-32-characters
-CORS_ALLOWED_ORIGINS=https://your-frontend.onrender.com
-ADMIN_USERNAME=admin
-ADMIN_PASSWORD=change-this-production-password
-```
-
-`DATABASE_URL` must be a JDBC URL for Spring Boot. If Supabase gives a URL beginning with `postgresql://`, convert it to `jdbc:postgresql://` and keep the username and password in `DATABASE_USERNAME` and `DATABASE_PASSWORD`.
-
-Render provides `PORT` automatically. The application uses `server.port=${PORT:8083}`, so it runs on Render's assigned port in production and `8083` locally.
-
-## Health Check
-
-Use this endpoint for Render health checks:
-
-```text
-GET /api/health
-```
-
-Expected response:
-
-```json
-{"status":"UP"}
-```
+1. **Database & Migrations**:
+   ```bash
+   npm run supabase:db:push
+   ```
+2. **Edge Functions (Hono + TypeScript)**:
+   ```bash
+   npm run supabase:functions:deploy
+   ```
+3. **CI/CD**:
+   Automated via [`.github/workflows/deploy-supabase.yml`](../.github/workflows/deploy-supabase.yml) on push to `main`.
