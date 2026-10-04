@@ -86,6 +86,7 @@ CREATE TABLE IF NOT EXISTS public.stalls (
     stall_type VARCHAR(100) NOT NULL,
     monthly_rent NUMERIC(12, 2) NOT NULL,
     status VARCHAR(50) NOT NULL DEFAULT 'AVAILABLE',
+    section VARCHAR(100),
     image_url TEXT,
     info VARCHAR(500),
     latitude DOUBLE PRECISION,
