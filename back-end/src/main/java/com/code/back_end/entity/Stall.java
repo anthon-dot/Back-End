@@ -8,6 +8,7 @@ import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "stalls")
+@JsonIgnoreProperties(ignoreUnknown = true)
 public class Stall {
 
     @Id
@@ -94,7 +95,7 @@ public class Stall {
         String normalized = status.trim().toUpperCase();
         this.status = switch (normalized) {
             case "VACANT" -> "AVAILABLE";
-            case "AVAILABLE", "OCCUPIED", "MAINTENANCE" -> normalized;
+            case "AVAILABLE", "OCCUPIED" -> normalized;
             default -> "AVAILABLE";
         };
     }
