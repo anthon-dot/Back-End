@@ -184,8 +184,12 @@ public class PaymentService {
                         )
                 );
 
-        if (payment.getPaymentType() == PaymentType.APPLICATION_FEE
-                || payment.getPaymentType() == PaymentType.BUSINESS_PERMIT_PAYMENT) {
+        // Normalize legacy BUSINESS_PERMIT_PAYMENT to canonical APPLICATION_FEE
+        if (payment.getPaymentType() == PaymentType.BUSINESS_PERMIT_PAYMENT) {
+            payment.setPaymentType(PaymentType.APPLICATION_FEE);
+        }
+
+        if (payment.getPaymentType() == PaymentType.APPLICATION_FEE) {
             securityService.requireTreasurerOrAdmin();
         } else {
             securityService.requireStakeholderOwnerOrStaff(

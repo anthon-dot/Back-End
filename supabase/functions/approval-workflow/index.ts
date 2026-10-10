@@ -1,4 +1,4 @@
-// Supabase Edge Function: approval-workflow
+﻿// Supabase Edge Function: approval-workflow
 // Built with TypeScript & Hono framework
 // Handles municipal market multi-stage approval workflow securely with Role-Based Access Control (RBAC)
 
@@ -494,7 +494,7 @@ async function handlePermitPayment(c: any) {
   await supabase.from("payments").insert({
     stakeholder_id: stakeholderId,
     amount: Number(amount || 0),
-    payment_type: "BUSINESS_PERMIT_PAYMENT",
+    payment_type: "APPLICATION_FEE",
     reference_no: referenceNo || "",
     receipt_no: receiptNo,
     payment_date: new Date().toISOString(),

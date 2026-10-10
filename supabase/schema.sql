@@ -1,4 +1,4 @@
--- ==============================================================================
+﻿-- ==============================================================================
 -- SUPABASE DATABASE SCHEMA FOR RENTAL MANAGEMENT SYSTEM
 -- Fully replaces Spring Boot JPA/Hibernate entities and database schema
 -- ==============================================================================
@@ -232,9 +232,23 @@ CREATE TABLE IF NOT EXISTS public.business_applications (
     remarks TEXT,
     market_supervisor_approved BOOLEAN NOT NULL DEFAULT FALSE,
     bplo_approved BOOLEAN NOT NULL DEFAULT FALSE,
+    endorsing_approved BOOLEAN NOT NULL DEFAULT FALSE,
+
+    applicant_fee_paid BOOLEAN NOT NULL DEFAULT FALSE,
+    applicant_fee_amount NUMERIC(12, 2) NOT NULL DEFAULT 0.00,
+    applicant_fee_date DATE,
+    verified_application BOOLEAN NOT NULL DEFAULT FALSE,
+    notes TEXT,
+
+    id_file_name VARCHAR(255),
+    id_file_path TEXT,
+    letter_file_name VARCHAR(255),
+    letter_file_path TEXT,
 
     applied_on DATE DEFAULT CURRENT_DATE,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    approved_on DATE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 CREATE INDEX IF NOT EXISTS idx_business_application_user ON public.business_applications(user_id);
@@ -349,6 +363,22 @@ DROP TRIGGER IF EXISTS trg_update_billing_on_payment ON public.payments;
 CREATE TRIGGER trg_update_billing_on_payment
     AFTER INSERT ON public.payments
     FOR EACH ROW EXECUTE FUNCTION public.update_billing_on_payment();
+
+-- Trigger to normalize legacy BUSINESS_PERMIT_PAYMENT to canonical APPLICATION_FEE
+CREATE OR REPLACE FUNCTION public.normalize_payment_type()
+RETURNS TRIGGER AS $$
+BEGIN
+    IF NEW.payment_type::text = 'BUSINESS_PERMIT_PAYMENT' THEN
+        NEW.payment_type := 'APPLICATION_FEE';
+    END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trg_normalize_payment_type ON public.payments;
+CREATE TRIGGER trg_normalize_payment_type
+    BEFORE INSERT OR UPDATE ON public.payments
+    FOR EACH ROW EXECUTE FUNCTION public.normalize_payment_type();
 
 -- ==============================================================================
 -- 13. NOTIFICATIONS
@@ -660,3 +690,35 @@ DROP POLICY IF EXISTS "Admins update system settings" ON public.system_settings;
 CREATE POLICY "Admins update system settings" ON public.system_settings
     FOR UPDATE USING (public.is_admin());
 
+
+-- ==============================================================================
+-- 18. JAVA BACKEND COMPATIBILITY TABLES (users, archive_records)
+-- ==============================================================================
+CREATE TABLE IF NOT EXISTS public.users (
+    id BIGSERIAL PRIMARY KEY,
+    name VARCHAR(255),
+    username VARCHAR(80) UNIQUE NOT NULL,
+    password VARCHAR(120) NOT NULL,
+    role VARCHAR(50),
+    status VARCHAR(50) DEFAULT 'ACTIVE',
+    reset_token VARCHAR(255),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS public.archive_records (
+    id BIGSERIAL PRIMARY KEY,
+    entity_name VARCHAR(100),
+    entity_id BIGINT,
+    archived_by BIGINT REFERENCES public.users(id) ON DELETE SET NULL,
+    reason TEXT,
+    archived_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+ALTER TABLE public.users ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.archive_records ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Admins manage users table" ON public.users;
+CREATE POLICY "Admins manage users table" ON public.users FOR ALL USING (public.is_admin());
+
+DROP POLICY IF EXISTS "Admins manage archive_records" ON public.archive_records;
+CREATE POLICY "Admins manage archive_records" ON public.archive_records FOR ALL USING (public.is_admin());

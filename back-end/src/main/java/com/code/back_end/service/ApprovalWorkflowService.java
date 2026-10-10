@@ -270,7 +270,7 @@ public class ApprovalWorkflowService {
         Payment payment = new Payment();
         payment.setStakeholder(stakeholder);
         payment.setAmount(request.getAmount());
-        payment.setPaymentType(PaymentType.BUSINESS_PERMIT_PAYMENT);
+        payment.setPaymentType(PaymentType.APPLICATION_FEE);
         payment.setReferenceNo(request.getReferenceNo());
         payment.setReceiptNo(generateReceiptNo("APP"));
         payment.setPaymentDate(LocalDateTime.now());
