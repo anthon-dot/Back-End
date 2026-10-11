@@ -109,4 +109,23 @@ public ResponseEntity<?> updateStatus(
                 .body(e.getMessage());
     }
 }
+
+    // =========================
+    // ACTIVATE IF ELIGIBLE
+    // =========================
+    @PostMapping("/{id}/activate-if-eligible")
+    public ResponseEntity<Boolean> activateIfEligible(
+            @PathVariable Long id
+    ) {
+        boolean activated = contractService.activateContractIfEligible(id);
+        return ResponseEntity.ok(activated);
+    }
+
+    @PostMapping("/stakeholder/{stakeholderId}/activate-if-eligible")
+    public ResponseEntity<Boolean> activateIfEligibleForStakeholder(
+            @PathVariable Long stakeholderId
+    ) {
+        boolean activated = contractService.activateContractIfEligibleForStakeholder(stakeholderId);
+        return ResponseEntity.ok(activated);
+    }
 }

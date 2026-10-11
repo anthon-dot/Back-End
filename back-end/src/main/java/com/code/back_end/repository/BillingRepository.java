@@ -21,6 +21,11 @@ public interface BillingRepository
             String billingPeriod
     );
 
+    Optional<Billing> findByContractIdAndBillingPeriod(
+            Long contractId,
+            String billingPeriod
+    );
+
     // =========================
     // FIND BILLINGS BY OCCUPANT
     // =========================

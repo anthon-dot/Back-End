@@ -29,6 +29,7 @@ public class ApplicantApprovalService {
     private final SecurityService securityService;
     private final AuditLogService auditLogService;
     private final NotificationService notificationService;
+    private final ContractService contractService;
 
     public ApplicantApprovalService(
             StakeholderRepository stakeholderRepo,
@@ -38,7 +39,8 @@ public class ApplicantApprovalService {
             BillingService billingService,
             SecurityService securityService,
             AuditLogService auditLogService,
-            NotificationService notificationService
+            NotificationService notificationService,
+            ContractService contractService
     ) {
         this.stakeholderRepo = stakeholderRepo;
         this.applicationRepo = applicationRepo;
@@ -48,6 +50,7 @@ public class ApplicantApprovalService {
         this.securityService = securityService;
         this.auditLogService = auditLogService;
         this.notificationService = notificationService;
+        this.contractService = contractService;
     }
 
     private Stakeholder findForApproval(Long id) {
@@ -77,8 +80,8 @@ public class ApplicantApprovalService {
                 saved.getId(),
                 "Market supervisor approved stakeholder"
         );
-
-        return saved;
+        contractService.activateContractIfEligibleForStakeholder(saved.getId());
+        return stakeholderRepo.findById(saved.getId()).orElse(saved);
     }
 
     public Stakeholder rejectMarketSupervisor(Long id) {
@@ -124,8 +127,8 @@ public class ApplicantApprovalService {
                 saved.getId(),
                 "BPLO approved stakeholder"
         );
-
-        return saved;
+        contractService.activateContractIfEligibleForStakeholder(saved.getId());
+        return stakeholderRepo.findById(saved.getId()).orElse(saved);
     }
 
     public Stakeholder rejectBplo(Long id) {
@@ -178,8 +181,8 @@ public class ApplicantApprovalService {
                 saved.getId(),
                 "Endorsing office approved stakeholder"
         );
-
-        return saved;
+        contractService.activateContractIfEligibleForStakeholder(saved.getId());
+        return stakeholderRepo.findById(saved.getId()).orElse(saved);
     }
 
     public Stakeholder rejectEndorsing(Long id, String remarks) {
@@ -263,8 +266,8 @@ public class ApplicantApprovalService {
                 saved.getId(),
                 "Business permit payment paid"
         );
-
-        return saved;
+        contractService.activateContractIfEligibleForStakeholder(saved.getId());
+        return stakeholderRepo.findById(saved.getId()).orElse(saved);
     }
 
     public Stakeholder approve(Long id) {
@@ -494,28 +497,6 @@ public class ApplicantApprovalService {
     }
 
     public void activateOccupantAndBilling(Stakeholder stakeholder) {
-        Occupant occupant = occupantRepo.findByStakeholder_IdAndIsArchivedFalse(stakeholder.getId())
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Stakeholder has no assigned stall"));
-
-        Contract contract = contractRepo.findFirstByOccupant_Stakeholder_IdOrderByCreatedAtDesc(stakeholder.getId())
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Stakeholder has no contract"));
-
-        occupant.setStatus("ACTIVE");
-        if (occupant.getOccupancyDate() == null) {
-            occupant.setOccupancyDate(LocalDate.now());
-        }
-
-        occupant.setContractId(contract.getId());
-        occupant.setAdvanceBalance(
-                stakeholder.getAdvanceBalance() == null ? BigDecimal.ZERO : stakeholder.getAdvanceBalance()
-        );
-        occupantRepo.save(occupant);
-
-        if (!"ACTIVE".equalsIgnoreCase(contract.getStatus())) {
-            contract.setStatus("ACTIVE");
-            contractRepo.save(contract);
-        }
-
-        billingService.generateInitialBilling(contract);
+        contractService.activateContractIfEligibleForStakeholder(stakeholder.getId());
     }
 }

@@ -37,6 +37,7 @@ public class ApprovalWorkflowService {
     private final BillingService billingService;
     private final AuditLogService auditLogService;
     private final SecurityService securityService;
+    private final ContractService contractService;
 
     public ApprovalWorkflowService(
             StakeholderRepository stakeholderRepository,
@@ -51,7 +52,8 @@ public class ApprovalWorkflowService {
             NotificationService notificationService,
             BillingService billingService,
             AuditLogService auditLogService,
-            SecurityService securityService
+            SecurityService securityService,
+            ContractService contractService
     ) {
         this.stakeholderRepository = stakeholderRepository;
         this.documentRepository = documentRepository;
@@ -66,6 +68,7 @@ public class ApprovalWorkflowService {
         this.billingService = billingService;
         this.auditLogService = auditLogService;
         this.securityService = securityService;
+        this.contractService = contractService;
     }
 
     public Stakeholder approveByTreasurer(
@@ -202,7 +205,8 @@ public class ApprovalWorkflowService {
         notificationService.createNotification(saved, "Stall Assigned", "Your stall and contract have been prepared.");
         auditLogService.log("STALL_ASSIGNED", "Stakeholder", saved.getId(), "Market supervisor assigned stall and created contract");
         syncApplication(saved);
-        return saved;
+        contractService.activateContractIfEligible(contract);
+        return stakeholderRepository.findById(saved.getId()).orElse(saved);
     }
 
     public Stakeholder approveBplo(Long stakeholderId) {
@@ -222,7 +226,8 @@ public class ApprovalWorkflowService {
         notificationService.createNotification(saved, "BPLO Approved", "Your business permit validation has been approved.");
         auditLogService.log("BPLO_APPROVED", "Stakeholder", saved.getId(), "BPLO approved stakeholder");
         syncApplication(saved);
-        return saved;
+        contractService.activateContractIfEligibleForStakeholder(saved.getId());
+        return stakeholderRepository.findById(saved.getId()).orElse(saved);
     }
 
     public Stakeholder finalEndorse(Long stakeholderId) {
@@ -248,7 +253,8 @@ public class ApprovalWorkflowService {
         notificationService.createNotification(saved, "Endorsing Office Approved", "Please proceed to the Treasurer for business permit payment.");
         auditLogService.log("FINAL_ENDORSED", "Stakeholder", saved.getId(), "Final endorsement completed");
         syncApplication(saved);
-        return saved;
+        contractService.activateContractIfEligibleForStakeholder(saved.getId());
+        return stakeholderRepository.findById(saved.getId()).orElse(saved);
     }
 
     public Stakeholder collectApplicantFee(
@@ -339,27 +345,7 @@ public class ApprovalWorkflowService {
     }
 
     private void activateBillingIfReady(Stakeholder stakeholder) {
-        if (!"COMPLETED".equals(stakeholder.getApplicationStatus())
-                || !Boolean.TRUE.equals(stakeholder.getApplicantFeePaid())) {
-            return;
-        }
-
-        contractRepository.findFirstByOccupant_Stakeholder_IdOrderByCreatedAtDesc(stakeholder.getId())
-                .ifPresent(contract -> {
-                    if (!"ACTIVE".equalsIgnoreCase(contract.getStatus())) {
-                        contract.setStatus("ACTIVE");
-                        contractRepository.save(contract);
-                    }
-
-                    Occupant occupant = contract.getOccupant();
-                    if (occupant != null) {
-                        occupant.setStatus("ACTIVE");
-                        occupant.setAdvanceBalance(stakeholder.getAdvanceBalance() == null ? BigDecimal.ZERO : stakeholder.getAdvanceBalance());
-                        occupantRepository.save(occupant);
-                    }
-
-                    billingService.generateInitialBilling(contract);
-                });
+        contractService.activateContractIfEligibleForStakeholder(stakeholder.getId());
     }
 
     private Stakeholder getStakeholder(Long id) {

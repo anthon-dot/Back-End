@@ -176,23 +176,27 @@ public void generateInitialBilling(
     // MONTHLY
     // =================================
     if ("MONTHLY".equals(normalizedFrequency)) {
-
-        while (!billingDate.isAfter(today)) {
-
+        if (billingDate.isAfter(today)) {
             createBilling(
-
                     contract,
-
                     billingDate,
-
                     "MONTHLY-"
                             + billingDate.getMonthValue()
                             + "-"
                             + billingDate.getYear()
             );
-
-            billingDate =
-                    billingDate.plusMonths(1);
+        } else {
+            while (!billingDate.isAfter(today)) {
+                createBilling(
+                        contract,
+                        billingDate,
+                        "MONTHLY-"
+                                + billingDate.getMonthValue()
+                                + "-"
+                                + billingDate.getYear()
+                );
+                billingDate = billingDate.plusMonths(1);
+            }
         }
     }
 
@@ -200,21 +204,21 @@ public void generateInitialBilling(
     // WEEKLY
     // =================================
     else if ("WEEKLY".equals(normalizedFrequency)) {
-
-        while (!billingDate.isAfter(today)) {
-
+        if (billingDate.isAfter(today)) {
             createBilling(
-
                     contract,
-
                     billingDate,
-
-                    "WEEKLY-"
-                            + billingDate
+                    "WEEKLY-" + billingDate
             );
-
-            billingDate =
-                    billingDate.plusWeeks(1);
+        } else {
+            while (!billingDate.isAfter(today)) {
+                createBilling(
+                        contract,
+                        billingDate,
+                        "WEEKLY-" + billingDate
+                );
+                billingDate = billingDate.plusWeeks(1);
+            }
         }
     }
 
@@ -223,24 +227,24 @@ public void generateInitialBilling(
     // =================================
     else if (
             "SEMI_MONTHLY".equals(normalizedFrequency)
-            ||
-            "15_DAYS".equals(normalizedFrequency)
+            || "15_DAYS".equals(normalizedFrequency)
     ) {
-
-        while (!billingDate.isAfter(today)) {
-
+        String periodPrefix = "15_DAYS".equals(normalizedFrequency) ? "15_DAYS-" : "SEMI_MONTHLY-";
+        if (billingDate.isAfter(today)) {
             createBilling(
-
                     contract,
-
                     billingDate,
-
-                    "SEMI_MONTHLY-"
-                            + billingDate
+                    periodPrefix + billingDate
             );
-
-            billingDate =
-                    billingDate.plusDays(15);
+        } else {
+            while (!billingDate.isAfter(today)) {
+                createBilling(
+                        contract,
+                        billingDate,
+                        periodPrefix + billingDate
+                );
+                billingDate = billingDate.plusDays(15);
+            }
         }
     }
 
@@ -248,22 +252,21 @@ public void generateInitialBilling(
     // DEFAULT
     // =================================
     else {
-
-        while (!billingDate.isAfter(today)) {
-
+        if (billingDate.isAfter(today)) {
             createBilling(
-
                     contract,
-
                     billingDate,
-
-                    normalizedFrequency
-                            + "-"
-                            + billingDate
+                    normalizedFrequency + "-" + billingDate
             );
-
-            billingDate =
-                    billingDate.plusMonths(1);
+        } else {
+            while (!billingDate.isAfter(today)) {
+                createBilling(
+                        contract,
+                        billingDate,
+                        normalizedFrequency + "-" + billingDate
+                );
+                billingDate = billingDate.plusMonths(1);
+            }
         }
     }
 }
@@ -463,7 +466,14 @@ public void autoGenerateBillings() {
                                 contract.getId(),
 
                                 billingPeriod
-                        );
+                        )
+                || billingRepository
+                        .findByContractIdAndBillingPeriod(
+
+                                contract.getId(),
+
+                                billingPeriod
+                        ).isPresent();
 
         if (exists) {
             log.debug(

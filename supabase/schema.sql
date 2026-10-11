@@ -319,6 +319,7 @@ CREATE TABLE IF NOT EXISTS public.billings (
 
 CREATE INDEX IF NOT EXISTS idx_billing_occupant ON public.billings(occupant_id);
 CREATE INDEX IF NOT EXISTS idx_billing_contract ON public.billings(contract_id);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_billings_contract_period ON public.billings(contract_id, billing_period) WHERE contract_id IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_billing_status ON public.billings(status);
 CREATE INDEX IF NOT EXISTS idx_billing_due_date ON public.billings(due_date);
 

@@ -48,6 +48,7 @@ public class PaymentService {
     private final ContractRepository contractRepository;
     private final OccupantRepository occupantRepository;
     private final BillingService billingService;
+    private final ContractService contractService;
 
     public PaymentService(
             PaymentRepository paymentRepository,
@@ -59,7 +60,8 @@ public class PaymentService {
             BusinessApplicationRepository applicationRepository,
             ContractRepository contractRepository,
             OccupantRepository occupantRepository,
-            BillingService billingService
+            BillingService billingService,
+            ContractService contractService
     ) {
 
         this.paymentRepository =
@@ -91,6 +93,9 @@ public class PaymentService {
 
         this.billingService =
                 billingService;
+
+        this.contractService =
+                contractService;
     }
 
     // =========================
@@ -551,38 +556,60 @@ public class PaymentService {
         }
 
         // =====================================================
-        // APPLICATION FORM
+        // APPLICATION FORM / APPLICATION FEE / BUSINESS PERMIT
         // =====================================================
-       else if (
-        payment.getPaymentType() == PaymentType.APPLICATION_FORM
-        || payment.getPaymentType() == PaymentType.APPLICATION_FEE
-        || payment.getPaymentType() == PaymentType.BUSINESS_PERMIT_PAYMENT
-) {
+        else if (
+                payment.getPaymentType() == PaymentType.APPLICATION_FORM
+                || payment.getPaymentType() == PaymentType.APPLICATION_FEE
+                || payment.getPaymentType() == PaymentType.BUSINESS_PERMIT_PAYMENT
+        ) {
 
-    log.info(
-            "Business permit/application fee payment detected for stakeholder {} amount {}",
-            stakeholder.getId(),
-            payment.getAmount()
-    );
+            log.info(
+                    "Business permit/application fee payment detected for stakeholder {} amount {}",
+                    stakeholder.getId(),
+                    payment.getAmount()
+            );
 
-    verifyStakeholderAfterApplicantFee(
-            stakeholder,
-            payment.getAmount()
-    );
+            // Record fee on stakeholder record
+            stakeholder.setApplicantFeePaid(true);
+            stakeholder.setApplicantFeeAmount(payment.getAmount());
+            stakeholder.setApplicantFeeDate(LocalDate.now());
+            stakeholder.setTreasurerPaid(true);
+            stakeholderRepository.save(stakeholder);
+            syncApplicationPayment(stakeholder);
 
-    syncApplicationPayment(stakeholder);
-    activateOccupantAndBilling(stakeholder);
+            // Save payment in database FIRST so activation evaluates actual persisted ledger
+            Payment saved = paymentRepository.save(payment);
 
-    notificationService.createNotification(
-            stakeholder,
-            "Business Permit Payment Confirmed",
-            "Your business permit payment has been confirmed. Your stakeholder account is now active."
-    );
-}
-        Payment saved =
-                paymentRepository.save(
-                payment
-        );
+            // Trigger centralized activation & billing generation
+            boolean activated = contractService.activateContractIfEligibleForStakeholder(stakeholder.getId());
+            if (activated) {
+                log.info("[Payment] Contract activated and initial billing generated for stakeholder {}", stakeholder.getId());
+                notificationService.createNotification(
+                        stakeholder,
+                        "Business Permit Payment Confirmed",
+                        "Your business permit payment has been confirmed and your lease contract is now active."
+                );
+            } else {
+                log.info("[Payment] Fee payment preserved for stakeholder {}, awaiting required approvals or contract creation", stakeholder.getId());
+                notificationService.createNotification(
+                        stakeholder,
+                        "Payment Recorded",
+                        "Your payment of ₱" + payment.getAmount() + " has been recorded. Contract activation will finalize once all required approvals are completed."
+                );
+            }
+
+            auditLogService.log(
+                    "PAYMENT_RECORDED",
+                    "Payment",
+                    saved.getId(),
+                    "Application fee payment recorded for stakeholder " + stakeholder.getId()
+            );
+
+            return saved;
+        }
+
+        Payment saved = paymentRepository.save(payment);
 
         log.debug(
                 "[Payment] saved payment {} stakeholder {} type {} amount {} rentCycle {}",
@@ -606,61 +633,7 @@ public class PaymentService {
     private void activateOccupantAndBilling(
             Stakeholder stakeholder
     ) {
-        if (!Boolean.TRUE.equals(stakeholder.getVerifiedTenant())) {
-            return;
-        }
-
-        Occupant occupant =
-                occupantRepository.findByStakeholder_IdAndIsArchivedFalse(
-                        stakeholder.getId()
-                ).orElse(null);
-
-        if (occupant == null) {
-            log.debug(
-                    "[Payment] billing generation skipped because stakeholder {} has no occupant",
-                    stakeholder.getId()
-            );
-            return;
-        }
-
-        Contract contract =
-                contractRepository.findFirstByOccupant_Stakeholder_IdOrderByCreatedAtDesc(
-                        stakeholder.getId()
-                ).orElse(null);
-
-        if (contract == null) {
-            log.debug(
-                    "[Payment] billing generation skipped because stakeholder {} has no contract",
-                    stakeholder.getId()
-            );
-            return;
-        }
-
-        occupant.setStatus("ACTIVE");
-
-        if (occupant.getOccupancyDate() == null) {
-            occupant.setOccupancyDate(LocalDate.now());
-        }
-
-        occupant.setContractId(contract.getId());
-        occupant.setAdvanceBalance(
-                stakeholder.getAdvanceBalance() == null
-                        ? BigDecimal.ZERO
-                        : stakeholder.getAdvanceBalance()
-        );
-
-        occupantRepository.save(occupant);
-
-        log.debug(
-                "[Payment] activated occupant {} stakeholder {} contract {} advanceBalance {} occupancyDate {}",
-                occupant.getId(),
-                stakeholder.getId(),
-                contract.getId(),
-                occupant.getAdvanceBalance(),
-                occupant.getOccupancyDate()
-        );
-
-        billingService.generateInitialBilling(contract);
+        contractService.activateContractIfEligibleForStakeholder(stakeholder.getId());
     }
 
     private void syncApplicationPayment(
