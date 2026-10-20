@@ -1,8 +1,13 @@
 {
   "name": "rental-management-supabase-backend",
-  "version": "1.0.0",
-  "description": "Supabase-only backend for Rental Management System",
+  "version": "2.0.0",
+  "description": "Node.js Express + Supabase backend for Public Market of Manticao Rental Management System",
+  "type": "module",
   "scripts": {
+    "start": "node server/src/server.js",
+    "server": "node server/src/server.js",
+    "test:server": "node server/tests/server-workflow.test.js",
+    "migrate:legacy": "node server/src/scripts/migrate-legacy-data.js",
     "supabase:login": "npx supabase login",
     "supabase:link": "npx supabase link --project-ref uzykxxphunglcwojoqtf",
     "supabase:db:push": "npx supabase db push --yes",
@@ -13,9 +18,16 @@
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.49.1",
-    "dotenv": "^17.4.2",
+    "cors": "^2.8.6",
+    "dotenv": "^18.0.8",
+    "express": "^5.3.0",
     "hono": "^4.7.2",
-    "pg": "^8.22.0"
+    "jspdf": "^4.2.1",
+    "multer": "^2.4.0",
+    "node-cron": "^4.6.0",
+    "nodemailer": "^10.1.1",
+    "pg": "^8.22.0",
+    "qrcode": "^1.5.4"
   },
   "devDependencies": {
     "supabase": "^2.117.0"

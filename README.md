@@ -1,120 +1,111 @@
-# Public Market Rental Management System — Supabase Backend
+# Public Market of Manticao - Rental Management System
 
-A high-performance, serverless backend architecture built on **Supabase** for the Public Market Stall & Rental Management System (Municipality of Manticao).
+An automated, role-governed rental lifecycle management platform for the **Public Market of Manticao (Misamis Oriental)**.
+
+Migrated from legacy Spring Boot monolithic architecture to **Vue.js 3 + Node.js Express + Supabase PostgreSQL**.
+
+---
 
 ## Architecture Overview
 
-This project has migrated from a hybrid Render + Supabase setup to a **100% Supabase Serverless Architecture**:
-
-```
-[ Frontend (React / Vue / Next.js) ]
-       │                                     │
-       ▼ (Direct JS Queries with RLS)        ▼ (Privileged Multi-Stage Workflow)
- [ Supabase Database + Auth + Storage ]   [ Supabase Edge Functions (Hono + TS) ]
-```
-
-- **Authentication & RBAC**: Supabase Auth (`auth.users`) synchronized with `public.profiles` via database triggers. Roles supported: `ADMIN`, `TREASURER`, `MARKET_SUPERVISOR`, `BPLO`, `ENDORSING_OFFICE`, `APPLICANT`, `TENANT`.
-- **Database & Security**: PostgreSQL with granular **Row Level Security (RLS)** on all tables.
-- **File Storage**: Supabase Storage bucket (`uploads`) for applicant IDs, clearance permits, and business letters.
-- **Serverless Edge Functions**: TypeScript + [Hono](https://hono.dev/) serverless functions handling multi-stage municipal approvals and Google Gemini AI insights.
-- **Automated Cron**: PostgreSQL `pg_cron` jobs automatically mark overdue invoices and alert administrators of expiring contracts.
-- **CI/CD**: GitHub Actions workflow automatically deploys migrations and edge functions on push to `main`.
+- **Frontend:** Vue.js 3, Vite, PrimeVue / Sakai design system, Leaflet interactive visual stall mapping.
+- **Backend API:** Node.js, Express.js REST API (`server/src/`), modular architecture.
+- **Database:** Supabase PostgreSQL with normalized schema, constraints, and Row Level Security (RLS).
+- **Authentication & Authorization:** Supabase Auth + Server-side JWT RBAC for **6 Principal Actors**:
+  1. `APPLICANT`
+  2. `VENDOR` (Active Tenant)
+  3. `MARKET_SUPERVISOR`
+  4. `MAYOR` (Executive Decisions)
+  5. `TREASURER` (Revenue & Collections)
+  6. `COLLECTOR_INSPECTOR` (Field Collections & Safety Inspections)
+  7. `ADMIN` (System Configuration)
+- **Document Generation:** 3-Year Contract of Lease PDF, Municipal Occupancy Permit with QR verification and SHA-256 integrity hash, Official Payment Receipts.
+- **Background Jobs:** `node-cron` workers handling monthly recurring billing on the 1st of each month and daily delinquency scans (30-, 60-, and 90-day demand notices).
 
 ---
 
-## Directory Structure
+## Getting Started
 
+### 1. Prerequisites
+- Node.js 18+ or 20+
+- npm 9+
+- Supabase account & project
+
+### 2. Environment Setup
+Copy the example environment file:
+```bash
+cp .env.example .env
 ```
-├── .github/workflows/
-│   └── deploy-supabase.yml              # CI/CD: Automated Supabase CLI deployment
-├── supabase/
-│   ├── config.toml                      # Supabase CLI project configuration
-│   ├── migrations/                      # Version-controlled database migrations
-│   │   ├── 20260920000001_initial_schema.sql
-│   │   ├── 20260920000002_storage_setup.sql
-│   │   └── 20260920000003_cron_jobs.sql
-│   ├── functions/                       # Deno TypeScript Edge Functions (Hono)
-│   │   ├── approval-workflow/index.ts   # Multi-stage municipal approval workflow
-│   │   ├── ai-insights/index.ts         # Google Gemini AI market intelligence briefings
-│   │   └── deno.json                    # Deno dependencies and import maps
-│   ├── schema.sql                       # Complete monolithic SQL schema
-│   ├── seed.sql                         # Initial market stall types and stalls
-│   ├── storage.sql                      # Bucket and storage policies
-│   └── cron.sql                         # Scheduled cron jobs
-├── SUPABASE_INTEGRATION_GUIDE.md        # Comprehensive frontend query guide
-├── package.json                         # Supabase deployment commands
-└── back-end/                            # Legacy Java Spring Boot application (archived)
+Configure your `.env` variables:
+```env
+PORT=5000
+VITE_BACKEND_URL=http://localhost:5000/api
+VITE_SUPABASE_URL=https://your-project.supabase.co
+VITE_SUPABASE_ANON_KEY=your-anon-key
+SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
+JWT_SECRET=your-32-char-jwt-secret
 ```
 
----
+### 3. Database Migration & Seeding
+Apply the SQL migration located in `supabase/migrations/`:
+```bash
+# Via Supabase CLI or Dashboard SQL Editor:
+supabase/migrations/20261020_complete_manticao_migration.sql
+supabase/seed.sql
+```
+Data dictionary reference: `docs/DATA_DICTIONARY.md`.
 
-## Deployment Guide
+### 4. Running the Application
 
-### Option A: Automatic Deployment (CI/CD via GitHub Actions)
+#### Start the Node.js Express Backend API
+```bash
+npm run server
+# Server listening on http://localhost:5000
+# Health check: http://localhost:5000/api/health
+```
 
-Add the following repository secrets in **GitHub -> Settings -> Secrets and variables -> Actions**:
-
-| Secret Name | Description | Where to find |
-| :--- | :--- | :--- |
-| `SUPABASE_ACCESS_TOKEN` | Supabase Personal Access Token | Supabase Dashboard -> Account -> Access Tokens |
-| `SUPABASE_PROJECT_ID` | Your Project Reference (`uzykxxphunglcwojoqtf`) | Project Settings -> General |
-| `SUPABASE_DB_PASSWORD` | PostgreSQL Database Password | Provided when creating project |
-
-Whenever code is pushed to `main`, GitHub Actions will automatically apply migrations and deploy the Edge Functions.
-
----
-
-### Option B: Manual CLI Deployment
-
-1. **Login to Supabase CLI**:
-   ```bash
-   npm run supabase:login
-   ```
-
-2. **Link to your cloud project**:
-   ```bash
-   npm run supabase:link
-   ```
-
-3. **Deploy database migrations**:
-   ```bash
-   npm run supabase:db:push
-   ```
-
-4. **Deploy Edge Functions**:
-   ```bash
-   npm run supabase:functions:deploy
-   ```
-
-5. **Deploy everything at once**:
-   ```bash
-   npm run supabase:deploy
-   ```
+#### Start the Vue.js Frontend (in parallel)
+```bash
+npm run dev
+# Vite dev server running at http://localhost:5173
+```
 
 ---
 
-## Edge Function Endpoints
+## Testing & Automation Verification
 
-### 1. `approval-workflow`
+Run the automated backend test suite:
+```bash
+npm run test:server
+```
+Runs 11/11 automated tests covering:
+- Role-based authorization across all principal actors.
+- Dynamic initial fee calculation: stall rights fee + 2 months advance rental baseline.
+- Cryptographic SHA-256 integrity hash and QR code generation for digital permits.
+- Multi-office application workflow state machine.
+- 3-Year Contract of Lease duration calculation.
+- Monthly recurring billing idempotency on `(contract_id, billing_period)`.
+- Advance credit amortization without duplicate cash payments.
+- Delinquency notice triggers (30, 60, and 90 days) and Mayoral revocation authorization.
+- Field collection remittance reconciliation without double revenue counting.
+- Inspector physical stall verification checklist and active vendor promotion.
 
-| Method | Path | Required Role | Purpose |
-| :--- | :--- | :--- | :--- |
-| `POST` | `/approval-workflow/treasurer-approve` | `TREASURER`, `ADMIN` | Records advance deposit and issues receipt |
-| `POST` | `/approval-workflow/assign-stall` | `MARKET_SUPERVISOR`, `ADMIN` | Assigns stall and prepares lease contract |
-| `POST` | `/approval-workflow/bplo-approve` | `BPLO`, `ADMIN` | Validates business permit requirements |
-| `POST` | `/approval-workflow/final-endorse` | `ENDORSING_OFFICE`, `ADMIN` | Final municipal endorsement |
-| `POST` | `/approval-workflow/permit-payment` | `TREASURER`, `ADMIN` | Final fee payment, activates contract and first invoice |
-| `POST` | `/approval-workflow/reject` | Reviewers | Disapproves application and releases stall |
-
-### 2. `ai-insights`
-
-| Method | Path | Purpose |
-| :--- | :--- | :--- |
-| `GET` | `/ai-insights/summary` | Executive briefing on occupancy and overdue accounts |
-| `POST` | `/ai-insights/generate` | On-demand customized report generation with Gemini AI |
+Run the client-side lifecycle and status scenario tests:
+```bash
+node src/test-rental-lifecycle.js
+node src/test-status-scenarios.js
+```
 
 ---
 
-## Frontend Integration
+## Legacy Data Migration Utility
+To safely normalize and map legacy Spring Boot database records into the new Supabase schema:
+```bash
+npm run migrate:legacy
+```
 
-See [`SUPABASE_INTEGRATION_GUIDE.md`](./SUPABASE_INTEGRATION_GUIDE.md) for full `@supabase/supabase-js` query hooks, authentication handling, and Realtime event subscriptions.
+---
+
+## Documentation Links
+- [Data Dictionary](docs/DATA_DICTIONARY.md)
+- [Migration Report](docs/MIGRATION_REPORT.md)
